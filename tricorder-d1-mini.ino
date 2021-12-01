@@ -1,8 +1,11 @@
 #include <SPI.h>
 #include <TFT_eSPI.h>
+#include <ESP8266WiFi.h>
 
-#define PISO_SH_LD_PIN 5
-#define POSI_BSRCLR_PIN 2 // Writing to 74HC595 shift registers when this is high
+#include "secrets.h"
+
+#define PISO_SH_LD_PIN 5 // Set high to read from 74HC165
+#define POSI_BSRCLR_PIN 2 // Set high to write to 74HC595 shift registers
 #define POSI_RCLK_PIN 16 // Positive edge copies 74HC595 shift registers to output
 
 #define WIDTH 240
@@ -23,10 +26,13 @@ void setup() {
   digitalWrite(POSI_RCLK_PIN, LOW);
 
   Serial.begin(9600);
+  //Serial.setDebugOutput(true);
+  
+  WiFi.begin(WIFI_SSID, WIFI_PASS);
 
   tft.init();
   tft.setRotation(2);
-  
+
   spr.createSprite(240, 50);
   spr.setTextDatum(MC_DATUM);
   spr.setTextColor(TFT_WHITE, TFT_BLUE);
@@ -39,41 +45,37 @@ void setup() {
 
   tft.fillScreen(TFT_BLUE);
   spr2.pushSprite(0, 250);
-  
-  delay(100);
+
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(200);
+  }
+
   Serial.println();
   Serial.println();
 }
 
 void loop() {
-  SPI.end();
-  
   SPI.beginTransaction(SPISettings(1000000, MSBFIRST, SPI_MODE2));
   digitalWrite(PISO_SH_LD_PIN, HIGH);
   byte input = SPI.transfer(0);
   digitalWrite(PISO_SH_LD_PIN, LOW);
   SPI.endTransaction();
-  
-  Serial.println(input, BIN);
 
   SPI.beginTransaction(SPISettings(100000, MSBFIRST, SPI_MODE3));
   digitalWrite(POSI_BSRCLR_PIN, HIGH);
-  //SPI.transfer(input);
-  SPI.transfer(0b01010101);
+  SPI.transfer(input);
   SPI.endTransaction();
-  
+
   digitalWrite(POSI_RCLK_PIN, HIGH);
   delay(1);
   digitalWrite(POSI_RCLK_PIN, LOW);
   delay(1);
   digitalWrite(POSI_BSRCLR_PIN, LOW);
 
-  SPI.begin();
-
   String buttonStatus = String(input, BIN);
   spr.fillSprite(TFT_BLUE);
   spr.drawString(buttonStatus, 120, 25, 4);
-  
+
   spr.pushSprite(0, 150);
 
   delay(50);
