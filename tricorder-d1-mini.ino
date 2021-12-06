@@ -11,9 +11,12 @@
 #define WIDTH 240
 #define HEIGHT 320
 
-TFT_eSPI tft = TFT_eSPI();           // TFT object
-TFT_eSprite spr = TFT_eSprite(&tft); // Sprite object
-TFT_eSprite spr2 = TFT_eSprite(&tft); // Sprite object
+#define CHUNK_SIZE 64
+
+TFT_eSPI tft = TFT_eSPI();
+TFT_eSprite spr = TFT_eSprite(&tft);
+
+WiFiClient client;
 
 void setup() {
   pinMode(PISO_SH_LD_PIN, OUTPUT);
@@ -36,23 +39,31 @@ void setup() {
   spr.createSprite(240, 50);
   spr.setTextDatum(MC_DATUM);
   spr.setTextColor(TFT_WHITE, TFT_BLUE);
-
-  spr2.createSprite(240, 50);
-  spr2.setTextDatum(MC_DATUM);
-  spr2.setTextColor(TFT_WHITE, TFT_BLUE);
-  spr2.fillSprite(TFT_BLUE);
-  spr2.drawString("I Love Pip!", 120, 25, 4);
-
+  
   tft.fillScreen(TFT_BLUE);
-  spr2.pushSprite(0, 250);
+
+  {
+    TFT_eSprite spr2 = TFT_eSprite(&tft);
+    spr2.createSprite(240, 50);
+    spr2.setTextDatum(MC_DATUM);
+    spr2.setTextColor(TFT_WHITE, TFT_BLUE);
+    spr2.fillSprite(TFT_BLUE);
+    spr2.drawString("I Love Pip!", 120, 25, 4);
+    spr2.pushSprite(0, 250);
+  }
 
   while (WiFi.status() != WL_CONNECTED) {
     delay(200);
   }
 
+  Serial.print("Heap space: ");
+  Serial.println(ESP.getFreeHeap());
+
   Serial.println();
   Serial.println();
 }
+
+byte lastInput = 0;
 
 void loop() {
   SPI.beginTransaction(SPISettings(1000000, MSBFIRST, SPI_MODE2));
@@ -78,5 +89,37 @@ void loop() {
 
   spr.pushSprite(0, 150);
 
+  byte pressed = input & ~lastInput;
+  if (pressed > 0) {
+    setSwitch("switch.corner_lamp", pressed == 0b1000);
+  }
+  lastInput = input;
+
   delay(50);
+}
+
+char netBuffer[512];
+
+void setSwitch(String entityName, bool targetState) {
+  int requestLen = sprintf(
+    netBuffer,
+    "POST /api/services/switch/turn_%s HTTP/1.0\r\n"
+      "Content-Type: application/json\r\n"
+      "Content-Length: %u\r\n"
+      "Authorization: Bearer %s\r\n"
+      "\r\n"
+      "{\"entity_id\":\"%s\"}\r\n"
+      "\r\n",
+    targetState ? "on" : "off",
+    entityName.length() + 16, // FIXME stupid way to do this
+    HOME_ASSISTANT_API_KEY,
+    entityName.c_str()
+  );
+
+  if (!client.connect(HOME_ASSISTANT_HOST, HOME_ASSISTANT_PORT)) {
+    Serial.println("Error connecting");
+    return;
+  }
+  client.write(netBuffer, requestLen);
+  client.stop();
 }
