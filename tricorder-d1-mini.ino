@@ -39,6 +39,15 @@ void setup() {
   tft.init();
   tft.setRotation(2);
 
+  tft.startWrite();
+  tft.writecommand(ST7789_PTLAR);
+  tft.writedata(0);
+  tft.writedata(0);
+  tft.writedata(0);
+  tft.writedata(240);
+  tft.writecommand(ST7789_PTLON);
+  tft.endWrite();
+
   spr.createSprite(240, 50);
   spr.setTextDatum(MC_DATUM);
   spr.setTextColor(TFT_WHITE, TFT_BLUE);
@@ -97,7 +106,9 @@ void loop() {
   } else if (pressed == 0b100) {
     setSwitch("switch.corner_lamp", false);
   } else if (pressed == 0b10) {
-    Serial.print("Before sleep");
+    tft.startWrite();
+    tft.writecommand(TFT_SLPIN);
+    tft.endWrite();
     ESP.deepSleep(3e6);
   }
   lastInput = input;
