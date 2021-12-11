@@ -1,8 +1,12 @@
 #include <SPI.h>
 #include <TFT_eSPI.h>
 #include <ESP8266WiFi.h>
+#include <AudioFileSourcePROGMEM.h>
+#include <AudioGeneratorWAV.h>
+#include <AudioOutputI2SNoDAC.h>
 
 #include "secrets.h"
+#include "sounds/tng_tricorder_scan.wav.h"
 
 #define PISO_SH_LD_PIN 5 // Set high to read from 74HC165
 #define POSI_BSRCLR_PIN 2 // Set high to write to 74HC595 shift registers
@@ -18,17 +22,12 @@ TFT_eSprite spr = TFT_eSprite(&tft);
 
 WiFiClient client;
 
+AudioFileSourcePROGMEM* audioFile;
+AudioGeneratorWAV* wav;
+AudioOutputI2SNoDAC* audioOut;
+
 void setup() {
   enableWiFiAtBootTime();
-
-  pinMode(PISO_SH_LD_PIN, OUTPUT);
-  digitalWrite(PISO_SH_LD_PIN, LOW);
-
-  pinMode(POSI_BSRCLR_PIN, OUTPUT);
-  digitalWrite(POSI_BSRCLR_PIN, LOW);
-
-  pinMode(POSI_RCLK_PIN, OUTPUT);
-  digitalWrite(POSI_RCLK_PIN, LOW);
 
   Serial.begin(9600);
   //Serial.setDebugOutput(true);
@@ -63,13 +62,25 @@ void setup() {
     spr2.pushSprite(60, 250);
   }
 
+  audioFile = new AudioFileSourcePROGMEM();
+  audioOut = new AudioOutputI2SNoDAC();
+  wav = new AudioGeneratorWAV();
+
+  pinMode(PISO_SH_LD_PIN, OUTPUT);
+  digitalWrite(PISO_SH_LD_PIN, LOW);
+
+  pinMode(POSI_BSRCLR_PIN, OUTPUT);
+  digitalWrite(POSI_BSRCLR_PIN, LOW);
+
+  pinMode(POSI_RCLK_PIN, OUTPUT);
+  digitalWrite(POSI_RCLK_PIN, LOW);
+
   while (WiFi.status() != WL_CONNECTED) {
     delay(200);
   }
 
   Serial.print("Heap space: ");
   Serial.println(ESP.getFreeHeap());
-
   Serial.println();
   Serial.println();
 }
@@ -94,11 +105,11 @@ void loop() {
   delay(1);
   digitalWrite(POSI_BSRCLR_PIN, LOW);
 
-  String buttonStatus = input == 0 ? "RDY" : String(input, BIN);
-  spr.fillSprite(TFT_BLUE);
-  spr.drawString(buttonStatus, 120, 25, 4);
-
-  spr.pushSprite(0, 150);
+//  String buttonStatus = input == 0 ? "RDY" : String(input, BIN);
+//  spr.fillSprite(TFT_BLUE);
+//  spr.drawString(buttonStatus, 120, 25, 4);
+//
+//  spr.pushSprite(0, 150);
 
   byte pressed = input & ~lastInput;
   if (pressed == 0b1000) {
@@ -110,10 +121,23 @@ void loop() {
     tft.writecommand(TFT_SLPIN);
     tft.endWrite();
     ESP.deepSleep(3e6);
+  } else if (pressed == 0b1) {
+    if (wav->isRunning()) {
+      wav->stop();
+    }
+    audioFile->open(tng_tricorder_scan_wav, sizeof(tng_tricorder_scan_wav));
+    wav->begin(audioFile, audioOut);
   }
   lastInput = input;
 
-  delay(50);
+  if (wav->isRunning()) {
+    if (!wav->loop()) {
+      wav->stop();
+      Serial.println("WAV done");
+    }
+  }
+
+  delay(1);
 }
 
 void setSwitch(const char* entityName, bool targetState) {
@@ -125,7 +149,6 @@ void setSwitch(const char* entityName, bool targetState) {
   );
 
   if (!client.connect(HOME_ASSISTANT_HOST, HOME_ASSISTANT_PORT)) {
-    Serial.println("Error connecting");
     return;
   }
 
