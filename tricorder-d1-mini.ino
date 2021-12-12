@@ -75,8 +75,11 @@ void setup() {
   pinMode(POSI_RCLK_PIN, OUTPUT);
   digitalWrite(POSI_RCLK_PIN, LOW);
 
+  write595(0b10000);
+
   while (WiFi.status() != WL_CONNECTED) {
     delay(200);
+    write595(0b10101);
   }
 
   Serial.print("Heap space: ");
@@ -85,18 +88,11 @@ void setup() {
   Serial.println();
 }
 
-byte lastInput = 0;
 
-void loop() {
-  SPI.beginTransaction(SPISettings(1000000, MSBFIRST, SPI_MODE2));
-  digitalWrite(PISO_SH_LD_PIN, HIGH);
-  byte input = SPI.transfer(0);
-  digitalWrite(PISO_SH_LD_PIN, LOW);
-  SPI.endTransaction();
-
+void write595(byte value) {
   SPI.beginTransaction(SPISettings(100000, MSBFIRST, SPI_MODE3));
   digitalWrite(POSI_BSRCLR_PIN, HIGH);
-  SPI.transfer(input);
+  SPI.transfer(value);
   SPI.endTransaction();
 
   digitalWrite(POSI_RCLK_PIN, HIGH);
@@ -104,31 +100,48 @@ void loop() {
   digitalWrite(POSI_RCLK_PIN, LOW);
   delay(1);
   digitalWrite(POSI_BSRCLR_PIN, LOW);
+}
 
-//  String buttonStatus = input == 0 ? "RDY" : String(input, BIN);
-//  spr.fillSprite(TFT_BLUE);
-//  spr.drawString(buttonStatus, 120, 25, 4);
-//
-//  spr.pushSprite(0, 150);
+byte lastInput = 0;
 
-  byte pressed = input & ~lastInput;
+void loop() {
+  SPI.beginTransaction(SPISettings(1000000, MSBFIRST, SPI_MODE2));
+  digitalWrite(PISO_SH_LD_PIN, HIGH);
+  byte input1 = SPI.transfer(0);
+  byte input2 = SPI.transfer(0);
+  digitalWrite(PISO_SH_LD_PIN, LOW);
+  SPI.endTransaction();
+
+  write595(input2 | 0b10000);
+
+  String buttonStatus = input1 == 0 ? "RDY" : String(input1, BIN);
+  spr.fillSprite(TFT_BLUE);
+  spr.drawString(buttonStatus, 120, 25, 4);
+  spr.pushSprite(0, 150);
+  buttonStatus = input2 == 0 ? "RDY" : String(input2, BIN);
+  spr.fillSprite(TFT_BLUE);
+  spr.drawString(buttonStatus, 120, 25, 4);
+  spr.pushSprite(0, 200);
+
+  byte pressed = input2 & ~lastInput;
   if (pressed == 0b1000) {
     setSwitch("switch.corner_lamp", true);
   } else if (pressed == 0b100) {
     setSwitch("switch.corner_lamp", false);
   } else if (pressed == 0b10) {
+    write595(0b100000); // Enable reset signal from reed switch
     tft.startWrite();
     tft.writecommand(TFT_SLPIN);
     tft.endWrite();
-    ESP.deepSleep(3e6);
-  } else if (pressed == 0b1) {
-    if (wav->isRunning()) {
-      wav->stop();
-    }
-    audioFile->open(tng_tricorder_scan_wav, sizeof(tng_tricorder_scan_wav));
-    wav->begin(audioFile, audioOut);
+    ESP.deepSleep(0);
+//  } else if (pressed == 0b1) {
+//    if (wav->isRunning()) {
+//      wav->stop();
+//    }
+//    audioFile->open(tng_tricorder_scan_wav, sizeof(tng_tricorder_scan_wav));
+//    wav->begin(audioFile, audioOut);
   }
-  lastInput = input;
+  lastInput = input2;
 
   if (wav->isRunning()) {
     if (!wav->loop()) {

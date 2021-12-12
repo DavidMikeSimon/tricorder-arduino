@@ -157,6 +157,8 @@
 
 // ###### EDIT THE PIN NUMBERS IN THE LINES FOLLOWING TO SUIT YOUR ESP8266 SETUP ######
 
+// DC CS CLK DIN
+
 // For NodeMCU - use pin numbers in the form PIN_Dx where Dx is the NodeMCU pin designation
 #define TFT_CS   4
 #define TFT_DC   0
