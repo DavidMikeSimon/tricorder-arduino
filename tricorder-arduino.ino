@@ -64,48 +64,15 @@ Adafruit_ZeroI2S i2s = Adafruit_ZeroI2S();
 // Define a C-major scale to play all the notes up and down.
 float scale[] = { C4_HZ, D4_HZ, E4_HZ, F4_HZ, G4_HZ, A4_HZ, B4_HZ, A4_HZ, G4_HZ, F4_HZ, E4_HZ, D4_HZ, C4_HZ };
 
-// Store basic waveforms in memory.
-int32_t sine[WAV_SIZE]     = {0};
+// Store basic waveform in memory.
 int32_t sawtooth[WAV_SIZE] = {0};
-int32_t triangle[WAV_SIZE] = {0};
-int32_t square[WAV_SIZE]   = {0};
 
-void generateSine(int32_t amplitude, int32_t* buffer, uint16_t length) {
-  // Generate a sine wave signal with the provided amplitude and store it in
-  // the provided buffer of size length.
-  for (int i=0; i<length; ++i) {
-    buffer[i] = int32_t(float(amplitude)*sin(2.0*PI*(1.0/length)*i));
-  }
-}
 void generateSawtooth(int32_t amplitude, int32_t* buffer, uint16_t length) {
   // Generate a sawtooth signal that goes from -amplitude/2 to amplitude/2
   // and store it in the provided buffer of size length.
   float delta = float(amplitude)/float(length);
   for (int i=0; i<length; ++i) {
     buffer[i] = -(amplitude/2)+delta*i;
-  }
-}
-
-void generateTriangle(int32_t amplitude, int32_t* buffer, uint16_t length) {
-  // Generate a triangle wave signal with the provided amplitude and store it in
-  // the provided buffer of size length.
-  float delta = float(amplitude)/float(length);
-  for (int i=0; i<length/2; ++i) {
-    buffer[i] = -(amplitude/2)+delta*i;
-  }
-    for (int i=length/2; i<length; ++i) {
-    buffer[i] = (amplitude/2)-delta*(i-length/2);
-  }
-}
-
-void generateSquare(int32_t amplitude, int32_t* buffer, uint16_t length) {
-  // Generate a square wave signal with the provided amplitude and store it in
-  // the provided buffer of size length.
-  for (int i=0; i<length/2; ++i) {
-    buffer[i] = -(amplitude/2);
-  }
-    for (int i=length/2; i<length; ++i) {
-    buffer[i] = (amplitude/2);
   }
 }
 
@@ -128,6 +95,19 @@ void playWave(int32_t* buffer, uint16_t length, float frequency, float seconds) 
     // stereo sound.
     i2s.write(sample, sample);
   }
+}
+
+void enterSleep() {
+  Serial.println("Sleep");
+  analogWrite(PIN_TFT_BL, 0);
+  delay(100);
+  USBDevice.detach();
+  LowPower.attachInterruptWakeup(PIN_MAGNET, wakeupInterruptCallback, CHANGE);
+  LowPower.sleep();
+
+  detachInterrupt(PIN_MAGNET);
+  analogWrite(PIN_TFT_BL, 255);
+  USBDevice.attach();
 }
 
 void wakeupInterruptCallback() {
@@ -184,7 +164,7 @@ void setup() {
 
   analogWrite(PIN_TFT_BL, 255);
 
-  for (int c = 0; c < 5; ++c) {
+  for (int c = 0; c < 2; ++c) {
     for (int i = 0; i <= 64; ++i) {
       analogWrite(PIN_LED_ALPHA, i);
       analogWrite(PIN_LED_BETA, (i+16)%64);
@@ -206,12 +186,8 @@ void setup() {
   i2s.enableTx();
 
   // Generate waveforms.
-  generateSine(AMPLITUDE, sine, WAV_SIZE);
   generateSawtooth(AMPLITUDE, sawtooth, WAV_SIZE);
-  generateTriangle(AMPLITUDE, triangle, WAV_SIZE);
-  generateSquare(AMPLITUDE, square, WAV_SIZE);
 
-//  tft.init();
 //  tft.setRotation(2);
 //
 //  tft.startWrite();
@@ -223,31 +199,25 @@ void setup() {
 //  tft.writecommand(ST7789_PTLON);
 //  tft.endWrite();
 
-  Serial.println("Sawtooth wave");
-  for (int i=0; i<sizeof(scale)/sizeof(float); ++i) {
-    // Play the note for a quarter of a second.
-    playWave(sawtooth, WAV_SIZE, scale[i], 0.25);
-    // Pause for a tenth of a second between notes.
-    delay(100);
-  }
+//  Serial.println("Sawtooth wave");
+//  for (int i=0; i<sizeof(scale)/sizeof(float); ++i) {
+//    // Play the note for a quarter of a second.
+//    playWave(sawtooth, WAV_SIZE, scale[i], 0.25);
+//    // Pause for a tenth of a second between notes.
+//    delay(100);
+//  }
 }
 
 void loop() {
   int value = digitalRead(PIN_SWITCH);
-  Serial.print("S:");
-  Serial.print(value);
-
-  analogWrite(PIN_TFT_BL, 255);
 
   if (value == 1) {
     tft.fillScreen(ST77XX_RED);
   } else {
-    //analogWrite(PIN_TFT_BL, 0);
     tft.fillScreen(ST77XX_BLUE);
   }
-  
-  value = digitalRead(PIN_MAGNET);
-  Serial.print(" R:");
+
+  Serial.print("S:");
   Serial.print(value);
 
   value = digitalRead(PIN_JOY_UP);
@@ -274,16 +244,15 @@ void loop() {
   Serial.print(" B:");
   Serial.print(value);
 
-//  if (reedSwitchValue == 0) {
-//    Serial.println("Sleep");
-//    delay(100);    
-//    USBDevice.detach();
-//    LowPower.attachInterruptWakeup(7, wakeupInterruptCallback, CHANGE);
-//    LowPower.sleep();
-//    detachInterrupt(7);
-//    USBDevice.attach();
-//  }
+  int reedSwitchValue = digitalRead(PIN_MAGNET);
+  Serial.print(" R:");
+  Serial.print(reedSwitchValue);
 
   Serial.println();
+
+  if (reedSwitchValue == 0) {
+    enterSleep();
+  }
+
   delay(100);
 }
