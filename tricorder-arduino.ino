@@ -14,8 +14,8 @@
 
 #define ST7789_PTLAR  0x30
 #define ST7789_PTLON  0x12
-#define ST7789_DISPOFF 0x28
-#define ST7789_DISPON 0x29
+#define ST7789_SLPIN  0x10
+#define ST7789_SLPOUT 0x11
 
 #define PIN_BTN_GEO   PIN_A0
 #define PIN_BTN_MET   PIN_A1
@@ -105,13 +105,16 @@ void playWave(int32_t* buffer, uint16_t length, float frequency, float seconds) 
 void enterSleep() {
   Serial.println("Sleep");
   analogWrite(PIN_TFT_BL, 0);
-  delay(100);
+  delay(120);
+  tft.sendCommand(ST7789_SLPIN);
   USBDevice.detach();
   LowPower.attachInterruptWakeup(PIN_MAGNET, wakeupInterruptCallback, CHANGE);
   LowPower.sleep();
 
   detachInterrupt(PIN_MAGNET);
   analogWrite(PIN_TFT_BL, 255);
+  delay(5);
+  tft.sendCommand(ST7789_SLPOUT);
   USBDevice.attach();
 }
 
@@ -211,10 +214,8 @@ void loop() {
 
   if (value == 1) {
     tft.fillScreen(ST77XX_GREEN);
-    tft.sendCommand(ST7789_DISPON);
   } else {
     tft.fillScreen(ST77XX_RED);
-    tft.sendCommand(ST7789_DISPOFF);
   }
 
   Serial.print("S:");
