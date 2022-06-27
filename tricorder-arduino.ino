@@ -7,9 +7,9 @@
 #include <math.h>
 
 //#include "secrets.h"
-//#include "sounds/tng_tricorder_close.wav.h"
-//#include "sounds/tng_tricorder_open.wav.h"
-#include "sounds/tng_tricorder_scan.wav.h"
+#include "sounds/tng_tricorder_close.wav.h"
+#include "sounds/tng_tricorder_open.wav.h"
+//#include "sounds/tng_tricorder_scan.wav.h"
 //#include "sounds/tng_tricorder_scan_low_beep.wav.h"
 
 #define ST7789_PTLAR  0x30
@@ -95,6 +95,16 @@ void playWave(int32_t* buffer, uint16_t length, float frequency, float seconds) 
   for (uint32_t i=0; i<iterations; ++i) {
     uint16_t pos = uint32_t(i*delta) % length;
     int32_t sample = buffer[pos];
+     // Duplicate the sample so it's sent to both the left and right channel.
+     // It appears the order is right channel, left channel if you want to write
+     // stereo sound.
+     i2s.write(sample, sample);
+  }
+}
+
+void playAudio16(const uint8_t* buffer, uint32_t length) {
+  for (uint32_t i=0; i<length/2; i++) {
+    uint16_t sample = ((uint16_t*)buffer)[i] * 256;
     // Duplicate the sample so it's sent to both the left and right channel.
     // It appears the order is right channel, left channel if you want to write
     // stereo sound.
@@ -102,20 +112,33 @@ void playWave(int32_t* buffer, uint16_t length, float frequency, float seconds) 
   }
 }
 
-void enterSleep() {
+void checkSleep() {
+  int reedSwitchValue = digitalRead(PIN_MAGNET);
+  if (reedSwitchValue != 0) {
+    return;
+  }
+
   Serial.println("Sleep");
   analogWrite(PIN_TFT_BL, 0);
-  delay(120);
+  // playAudio16(tng_tricorder_close_wav, TNG_TRICORDER_CLOSE_WAV_LEN);
+  playWave(sawtooth, WAV_SIZE, scale[3], 0.25);
+  delay(120); // From ST7789 docs, need 120ms between SLPOUT and SLPIN
   tft.sendCommand(ST7789_SLPIN);
   USBDevice.detach();
-  LowPower.attachInterruptWakeup(PIN_MAGNET, wakeupInterruptCallback, CHANGE);
-  LowPower.sleep();
 
-  detachInterrupt(PIN_MAGNET);
+  reedSwitchValue = digitalRead(PIN_MAGNET);
+  if (reedSwitchValue == 0) {
+    LowPower.attachInterruptWakeup(PIN_MAGNET, wakeupInterruptCallback, CHANGE);
+    LowPower.sleep();
+    detachInterrupt(PIN_MAGNET);
+  }
+
   analogWrite(PIN_TFT_BL, 255);
-  delay(5);
+  delay(5); // From ST7789 docs, need 5ms between last SLPIN and SLPOUT
   tft.sendCommand(ST7789_SLPOUT);
   USBDevice.attach();
+  //playWave16(tng_tricorder_open_wav, TNG_TRICORDER_OPEN_WAV_LEN);
+  playWave(sawtooth, WAV_SIZE, scale[8], 0.25);
 }
 
 void wakeupInterruptCallback() {
@@ -188,7 +211,7 @@ void setup() {
   analogWrite(PIN_LED_DELTA, 0);
   analogWrite(PIN_LED_GAMMA, 0);
 
-  if (!i2s.begin(I2S_32_BIT, 44100)) {
+  if (!i2s.begin(I2S_32_BIT, 22050)) {
     Serial.println("Unable to initialize I2S");
   }
   i2s.enableTx();
@@ -245,15 +268,13 @@ void loop() {
   Serial.print(" B:");
   Serial.print(value);
 
-  int reedSwitchValue = digitalRead(PIN_MAGNET);
+  value = digitalRead(PIN_MAGNET);
   Serial.print(" R:");
-  Serial.print(reedSwitchValue);
+  Serial.print(value);
 
   Serial.println();
 
-  if (reedSwitchValue == 0) {
-    enterSleep();
-  }
+  checkSleep();
 
   delay(100);
 }
