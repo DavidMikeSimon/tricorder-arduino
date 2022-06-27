@@ -12,6 +12,11 @@
 #include "sounds/tng_tricorder_scan.wav.h"
 //#include "sounds/tng_tricorder_scan_low_beep.wav.h"
 
+#define ST7789_PTLAR  0x30
+#define ST7789_PTLON  0x12
+#define ST7789_DISPOFF 0x28
+#define ST7789_DISPON 0x29
+
 #define PIN_BTN_GEO   PIN_A0
 #define PIN_BTN_MET   PIN_A1
 #define PIN_BTN_BIO   PIN_A2
@@ -160,7 +165,7 @@ void setup() {
   //while (!Serial) delay(10);
 
   tft.init(240, 320);
-  tft.fillScreen(ST77XX_BLUE);
+  tft.fillScreen(ST77XX_BLACK);
 
   analogWrite(PIN_TFT_BL, 255);
 
@@ -188,16 +193,9 @@ void setup() {
   // Generate waveforms.
   generateSawtooth(AMPLITUDE, sawtooth, WAV_SIZE);
 
-//  tft.setRotation(2);
-//
-//  tft.startWrite();
-//  tft.writecommand(ST7789_PTLAR);
-//  tft.writedata(0);
-//  tft.writedata(0);
-//  tft.writedata(0);
-//  tft.writedata(240);
-//  tft.writecommand(ST7789_PTLON);
-//  tft.endWrite();
+  const uint8_t partialArea[] = {0, 0, 0, 195};
+  tft.sendCommand(ST7789_PTLAR, partialArea, 4);
+  tft.sendCommand(ST7789_PTLON);
 
 //  Serial.println("Sawtooth wave");
 //  for (int i=0; i<sizeof(scale)/sizeof(float); ++i) {
@@ -212,9 +210,11 @@ void loop() {
   int value = digitalRead(PIN_SWITCH);
 
   if (value == 1) {
-    tft.fillScreen(ST77XX_RED);
+    tft.fillScreen(ST77XX_GREEN);
+    tft.sendCommand(ST7789_DISPON);
   } else {
-    tft.fillScreen(ST77XX_BLUE);
+    tft.fillScreen(ST77XX_RED);
+    tft.sendCommand(ST7789_DISPOFF);
   }
 
   Serial.print("S:");
