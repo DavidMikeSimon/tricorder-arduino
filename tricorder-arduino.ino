@@ -4,9 +4,10 @@
 #include <Adafruit_ZeroI2S.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_ST7789.h>
+#include <WiFiNINA.h>
 #include <math.h>
 
-//#include "secrets.h"
+#include "secrets.h"
 #include "sounds/tng_tricorder_close.wav.h"
 #include "sounds/tng_tricorder_open.wav.h"
 //#include "sounds/tng_tricorder_scan.wav.h"
@@ -43,6 +44,7 @@ Adafruit_ST7789 tft = Adafruit_ST7789(PIN_TFT_CS, PIN_TFT_DC, -1);
 // Use default pins in board variant
 Adafruit_ZeroI2S i2s = Adafruit_ZeroI2S();
 
+WiFiClient client;
 
 #define SAMPLERATE_HZ 44100  // The sample rate of the audio.  Higher sample rates have better fidelity,
                              // but these tones are so simple it won't make a difference.  44.1khz is
@@ -145,31 +147,39 @@ void wakeupInterruptCallback() {
   // Do nothing
 }
 
-//void setSwitch(const char* entityName, bool targetState) {
-//  char reqBodyBuffer[256];
-//  int reqBodyLen = sprintf(
-//                     reqBodyBuffer,
-//                     "{\"entity_id\":\"%s\"}\r\n\r\n",
-//                     entityName
-//                   );
-//
-//  if (!client.connect(HOME_ASSISTANT_HOST, HOME_ASSISTANT_PORT)) {
-//    return;
-//  }
-//
-//  client.printf(
-//    "POST /api/services/switch/turn_%s HTTP/1.0\r\n"
-//    "Content-Type: application/json\r\n"
-//    "Content-Length: %u\r\n"
-//    "Authorization: Bearer %s\r\n"
-//    "\r\n",
-//    targetState ? "on" : "off",
-//    reqBodyLen,
-//    HOME_ASSISTANT_API_KEY
-//  );
-//  client.write(reqBodyBuffer, reqBodyLen);
-//  client.stop();
-//}
+void setHassSwitch(const char* entityName, bool targetState) {
+  Serial.println("setHassSwitch");
+  char reqBodyBuffer[256];
+  int reqBodyLen = sprintf(
+    reqBodyBuffer,
+    "{\"entity_id\":\"%s\"}\r\n\r\n",
+    entityName
+  );
+
+  char reqHeaderBuffer[512];
+  int reqHeaderLen = sprintf(
+    reqHeaderBuffer,
+    "POST /api/services/switch/turn_%s HTTP/1.0\r\n"
+    "Content-Type: application/json\r\n"
+    "Content-Length: %u\r\n"
+    "Authorization: Bearer %s\r\n"
+    "Connection: close\r\n"
+    "\r\n",
+    targetState ? "on" : "off",
+    reqBodyLen,
+    HOME_ASSISTANT_API_KEY
+  );
+
+
+  if (!client.connect(HOME_ASSISTANT_HOST, HOME_ASSISTANT_PORT)) {
+    Serial.println("Connection failed");
+    return;
+  }
+
+  client.write(reqHeaderBuffer, reqHeaderLen);
+  client.write(reqBodyBuffer, reqBodyLen);
+  client.stop();
+}
 
 void setup() {
   pinMode(PIN_SWITCH, INPUT_PULLUP);
@@ -192,6 +202,21 @@ void setup() {
 
   tft.init(240, 320);
   tft.fillScreen(ST77XX_BLACK);
+
+  int status = WL_IDLE_STATUS;
+  while (status != WL_CONNECTED) {
+    Serial.print("Attempting to connect to SSID: ");
+    Serial.println(WIFI_SSID);
+    status = WiFi.begin(WIFI_SSID, WIFI_PASS);
+
+    if (WiFi.status() == WL_NO_MODULE) {
+      Serial.println("Communication with WiFi module failed!");
+      break;
+    }
+    
+    //WiFi.lowPowerMode();
+    delay(500);
+  }
 
   analogWrite(PIN_TFT_BL, 255);
 
@@ -233,44 +258,37 @@ void setup() {
 }
 
 void loop() {
-  int value = digitalRead(PIN_SWITCH);
+  int switchValue = digitalRead(PIN_SWITCH);
+  Serial.print("S:");
+  Serial.print(switchValue);
 
-  if (value == 1) {
+  if (switchValue == 1) {
     tft.fillScreen(ST77XX_GREEN);
   } else {
     tft.fillScreen(ST77XX_RED);
   }
 
-  Serial.print("S:");
-  Serial.print(value);
-
-  value = digitalRead(PIN_JOY_UP);
-  Serial.print(" U:");
-  Serial.print(value);
-
-  value = digitalRead(PIN_JOY_BTN);
-  Serial.print(" J:");
-  Serial.print(value);
-
-  value = digitalRead(PIN_JOY_DOWN);
-  Serial.print(" D:");
-  Serial.print(value);
-
-  value = analogRead(PIN_BTN_GEO);
+  int geoValue = analogRead(PIN_BTN_GEO);
   Serial.print(" G:");
-  Serial.print(value);
+  Serial.print(geoValue);
 
-  value = analogRead(PIN_BTN_MET);
+  int metValue = analogRead(PIN_BTN_MET);
   Serial.print(" M:");
-  Serial.print(value);
-
-  value = analogRead(PIN_BTN_BIO);
+  Serial.print(metValue);
+  
+  int bioValue = analogRead(PIN_BTN_BIO);
   Serial.print(" B:");
-  Serial.print(value);
+  Serial.print(bioValue);
 
-  value = digitalRead(PIN_MAGNET);
+  if (metValue < 50) {
+    setHassSwitch("switch.corner_lamp", false);
+  } else if (bioValue < 50) {
+    setHassSwitch("switch.corner_lamp", true);
+  }
+
+  magnetValue = digitalRead(PIN_MAGNET);
   Serial.print(" R:");
-  Serial.print(value);
+  Serial.print(magnetValue);
 
   Serial.println();
 
