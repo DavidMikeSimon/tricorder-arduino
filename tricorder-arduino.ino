@@ -46,7 +46,7 @@ Adafruit_ZeroI2S i2s = Adafruit_ZeroI2S();
 
 WiFiClient client;
 
-#define SAMPLERATE_HZ 44100  // The sample rate of the audio.  Higher sample rates have better fidelity,
+#define SAMPLERATE_HZ 22050  // The sample rate of the audio.  Higher sample rates have better fidelity,
                              // but these tones are so simple it won't make a difference.  44.1khz is
                              // standard CD quality sound.
 
@@ -105,8 +105,12 @@ void playWave(int32_t* buffer, uint16_t length, float frequency, float seconds) 
 }
 
 void playAudio16(const uint8_t* buffer, uint32_t length) {
+  char buf[100];
+  sprintf(buf, "BUFFER:%p LEN:%i ITEM:%x VAR:%p", buffer, length, buffer[length-1], &sawtooth);
+  Serial.println(buf);
+  return;
   for (uint32_t i=0; i<length/2; i++) {
-    uint16_t sample = ((uint16_t*)buffer)[i] * 256;
+    uint16_t sample = ((uint16_t*)buffer)[i];
     // Duplicate the sample so it's sent to both the left and right channel.
     // It appears the order is right channel, left channel if you want to write
     // stereo sound.
@@ -122,7 +126,7 @@ void checkSleep() {
 
   Serial.println("Sleep");
   analogWrite(PIN_TFT_BL, 0);
-  // playAudio16(tng_tricorder_close_wav, TNG_TRICORDER_CLOSE_WAV_LEN);
+  //playAudio16(tng_tricorder_close_wav, TNG_TRICORDER_CLOSE_WAV_LEN);
   playWave(sawtooth, WAV_SIZE, scale[3], 0.25);
   delay(120); // From ST7789 docs, need 120ms between SLPOUT and SLPIN
   tft.sendCommand(ST7789_SLPIN);
@@ -201,7 +205,10 @@ void setup() {
   //while (!Serial) delay(10);
 
   tft.init(240, 320);
-  tft.fillScreen(ST77XX_BLACK);
+  tft.fillScreen(ST77XX_ORANGE);
+
+  analogWrite(PIN_TFT_BL, 255);
+
 
   int status = WL_IDLE_STATUS;
   while (status != WL_CONNECTED) {
@@ -218,7 +225,6 @@ void setup() {
     delay(500);
   }
 
-  analogWrite(PIN_TFT_BL, 255);
 
   for (int c = 0; c < 2; ++c) {
     for (int i = 0; i <= 64; ++i) {
@@ -236,7 +242,7 @@ void setup() {
   analogWrite(PIN_LED_DELTA, 0);
   analogWrite(PIN_LED_GAMMA, 0);
 
-  if (!i2s.begin(I2S_32_BIT, 22050)) {
+  if (!i2s.begin(I2S_32_BIT, SAMPLERATE_HZ)) {
     Serial.println("Unable to initialize I2S");
   }
   i2s.enableTx();
@@ -259,8 +265,6 @@ void setup() {
 
 void loop() {
   int switchValue = digitalRead(PIN_SWITCH);
-  Serial.print("S:");
-  Serial.print(switchValue);
 
   if (switchValue == 1) {
     tft.fillScreen(ST77XX_GREEN);
@@ -269,28 +273,14 @@ void loop() {
   }
 
   int geoValue = analogRead(PIN_BTN_GEO);
-  Serial.print(" G:");
-  Serial.print(geoValue);
-
   int metValue = analogRead(PIN_BTN_MET);
-  Serial.print(" M:");
-  Serial.print(metValue);
-  
   int bioValue = analogRead(PIN_BTN_BIO);
-  Serial.print(" B:");
-  Serial.print(bioValue);
 
   if (metValue < 50) {
     setHassSwitch("switch.corner_lamp", false);
   } else if (bioValue < 50) {
     setHassSwitch("switch.corner_lamp", true);
   }
-
-  magnetValue = digitalRead(PIN_MAGNET);
-  Serial.print(" R:");
-  Serial.print(magnetValue);
-
-  Serial.println();
 
   checkSleep();
 
