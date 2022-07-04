@@ -46,76 +46,16 @@ Adafruit_ZeroI2S i2s = Adafruit_ZeroI2S();
 
 WiFiClient client;
 
-#define SAMPLERATE_HZ 22050  // The sample rate of the audio.  Higher sample rates have better fidelity,
-                             // but these tones are so simple it won't make a difference.  44.1khz is
-                             // standard CD quality sound.
-
-#define AMPLITUDE     ((1<<29)-1)   // Set the amplitude of generated waveforms.  This controls how loud
-                             // the signals are, and can be any value from 0 to 2**31 - 1.  Start with
-                             // a low value to prevent damaging speakers!
-
-#define WAV_SIZE      256    // The size of each generated waveform.  The larger the size the higher
-                             // quality the signal.  A size of 256 is more than enough for these simple
-                             // waveforms.
-
-
-// Define the frequency of music notes (from http://www.phy.mtu.edu/~suits/notefreqs.html):
-#define C4_HZ      261.63
-#define D4_HZ      293.66
-#define E4_HZ      329.63
-#define F4_HZ      349.23
-#define G4_HZ      392.00
-#define A4_HZ      440.00
-#define B4_HZ      493.88
-
-// Define a C-major scale to play all the notes up and down.
-float scale[] = { C4_HZ, D4_HZ, E4_HZ, F4_HZ, G4_HZ, A4_HZ, B4_HZ, A4_HZ, G4_HZ, F4_HZ, E4_HZ, D4_HZ, C4_HZ };
-
-// Store basic waveform in memory.
-int32_t sawtooth[WAV_SIZE] = {0};
-
-void generateSawtooth(int32_t amplitude, int32_t* buffer, uint16_t length) {
-  // Generate a sawtooth signal that goes from -amplitude/2 to amplitude/2
-  // and store it in the provided buffer of size length.
-  float delta = float(amplitude)/float(length);
-  for (int i=0; i<length; ++i) {
-    buffer[i] = -(amplitude/2)+delta*i;
-  }
-}
-
-void playWave(int32_t* buffer, uint16_t length, float frequency, float seconds) {
-  // Play back the provided waveform buffer for the specified
-  // amount of seconds.
-  // First calculate how many samples need to play back to run
-  // for the desired amount of seconds.
-  uint32_t iterations = seconds*SAMPLERATE_HZ;
-  // Then calculate the 'speed' at which we move through the wave
-  // buffer based on the frequency of the tone being played.
-  float delta = (frequency*length)/float(SAMPLERATE_HZ);
-  // Now loop through all the samples and play them, calculating the
-  // position within the wave buffer for each moment in time.
-  for (uint32_t i=0; i<iterations; ++i) {
-    uint16_t pos = uint32_t(i*delta) % length;
-    int32_t sample = buffer[pos];
-     // Duplicate the sample so it's sent to both the left and right channel.
-     // It appears the order is right channel, left channel if you want to write
-     // stereo sound.
-     i2s.write(sample, sample);
-  }
-}
-
 void playAudio16(const uint8_t* buffer, uint32_t length) {
-  char buf[100];
-  sprintf(buf, "BUFFER:%p LEN:%i ITEM:%x VAR:%p", buffer, length, buffer[length-1], &sawtooth);
-  Serial.println(buf);
-  return;
   for (uint32_t i=0; i<length/2; i++) {
-    uint16_t sample = ((uint16_t*)buffer)[i];
-    // Duplicate the sample so it's sent to both the left and right channel.
-    // It appears the order is right channel, left channel if you want to write
-    // stereo sound.
+    // Can't seem to run I2S in 16-bit mode, so let's run it in 32-bit mode
+    // and transform our 16-bit sample to 32-bit.
+    int32_t sample = ((uint16_t*)buffer)[i] << 16;
     i2s.write(sample, sample);
   }
+  // For some reason, it crashes if we don't print something to serial
+  // after playing samples but before sleeping...
+  Serial.println("Samples sent");
 }
 
 void checkSleep() {
@@ -126,8 +66,8 @@ void checkSleep() {
 
   Serial.println("Sleep");
   analogWrite(PIN_TFT_BL, 0);
-  //playAudio16(tng_tricorder_close_wav, TNG_TRICORDER_CLOSE_WAV_LEN);
-  playWave(sawtooth, WAV_SIZE, scale[3], 0.25);
+  playAudio16(tng_tricorder_close_wav, TNG_TRICORDER_CLOSE_WAV_LEN);
+  //playWave(sawtooth, WAV_SIZE, scale[3], 0.25);
   delay(120); // From ST7789 docs, need 120ms between SLPOUT and SLPIN
   tft.sendCommand(ST7789_SLPIN);
   USBDevice.detach();
@@ -143,8 +83,8 @@ void checkSleep() {
   delay(5); // From ST7789 docs, need 5ms between last SLPIN and SLPOUT
   tft.sendCommand(ST7789_SLPOUT);
   USBDevice.attach();
-  //playWave16(tng_tricorder_open_wav, TNG_TRICORDER_OPEN_WAV_LEN);
-  playWave(sawtooth, WAV_SIZE, scale[8], 0.25);
+  playAudio16(tng_tricorder_open_wav, TNG_TRICORDER_OPEN_WAV_LEN);
+  //playWave(sawtooth, WAV_SIZE, scale[8], 0.25);
 }
 
 void wakeupInterruptCallback() {
@@ -209,11 +149,8 @@ void setup() {
 
   analogWrite(PIN_TFT_BL, 255);
 
-
   int status = WL_IDLE_STATUS;
   while (status != WL_CONNECTED) {
-    Serial.print("Attempting to connect to SSID: ");
-    Serial.println(WIFI_SSID);
     status = WiFi.begin(WIFI_SSID, WIFI_PASS);
 
     if (WiFi.status() == WL_NO_MODULE) {
@@ -221,20 +158,17 @@ void setup() {
       break;
     }
     
-    //WiFi.lowPowerMode();
-    delay(500);
-  }
-
-
-  for (int c = 0; c < 2; ++c) {
     for (int i = 0; i <= 64; ++i) {
       analogWrite(PIN_LED_ALPHA, i);
       analogWrite(PIN_LED_BETA, (i+16)%64);
       analogWrite(PIN_LED_DELTA, (i+32)%64);
       analogWrite(PIN_LED_GAMMA, (i+48)%64);
-      delay(10);
+      delay(8);
     }
-  }  
+  }
+
+  WiFi.lowPowerMode();
+
   Serial.println("OK!");
 
   analogWrite(PIN_LED_ALPHA, 0);
@@ -242,25 +176,14 @@ void setup() {
   analogWrite(PIN_LED_DELTA, 0);
   analogWrite(PIN_LED_GAMMA, 0);
 
-  if (!i2s.begin(I2S_32_BIT, SAMPLERATE_HZ)) {
+  if (!i2s.begin(I2S_32_BIT, 22050)) {
     Serial.println("Unable to initialize I2S");
   }
   i2s.enableTx();
 
-  // Generate waveforms.
-  generateSawtooth(AMPLITUDE, sawtooth, WAV_SIZE);
-
   const uint8_t partialArea[] = {0, 0, 0, 195};
   tft.sendCommand(ST7789_PTLAR, partialArea, 4);
   tft.sendCommand(ST7789_PTLON);
-
-//  Serial.println("Sawtooth wave");
-//  for (int i=0; i<sizeof(scale)/sizeof(float); ++i) {
-//    // Play the note for a quarter of a second.
-//    playWave(sawtooth, WAV_SIZE, scale[i], 0.25);
-//    // Pause for a tenth of a second between notes.
-//    delay(100);
-//  }
 }
 
 void loop() {
