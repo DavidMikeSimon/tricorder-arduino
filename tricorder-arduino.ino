@@ -205,7 +205,9 @@ void loop() {
     setHassSwitch("switch.corner_lamp", true);
   }
 
-  checkSleep();
+  if (millis() > 3000) {
+    checkSleep();
+  }
 
   delay(100);
 }
