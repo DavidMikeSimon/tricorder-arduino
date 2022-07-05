@@ -126,10 +126,21 @@ void setHassSwitch(const char* entityName, bool targetState) {
   client.stop();
 }
 
+#define NUM_BTN_COLORS 9
+int btnColors[NUM_BTN_COLORS] = {
+  LCARS_RED,
+  LCARS_ORANGE,
+  LCARS_ORANGE,
+  LCARS_YELLOW,
+  LCARS_BLUE,
+  LCARS_YELLOW,
+  LCARS_ORANGE,
+  LCARS_ORANGE,
+  LCARS_ORANGE
+};
+
 void drawScreen() {
   // Drawable points from 0, 124 to 240, 320
-
-  tft.fillScreen(ST77XX_BLACK);
 
   lcarsBox(
     0, 124,
@@ -137,7 +148,7 @@ void drawScreen() {
     20, 0,
     1, 0,
     0, 0,
-    LCARS_ORANGE
+    btnColors[1]
   );
 
   lcarsBox(
@@ -146,7 +157,7 @@ void drawScreen() {
     20, 0,
     0, 0,
     -1, 0,
-    LCARS_ORANGE
+    btnColors[1]
   );
 
   lcarsBox(
@@ -155,14 +166,14 @@ void drawScreen() {
     0, 5,
     0, 1,
     0, 1,
-    LCARS_RED
+    btnColors[0]
   );
 
   lcarsBox(
     0, 188,
     40, 204,
     0, 0, 0, 0, 0, 0,
-    LCARS_ORANGE
+    btnColors[2]
   );
 
   lcarsBox(
@@ -171,7 +182,7 @@ void drawScreen() {
     20, 0,
     0, 0,
     1, 0,
-    LCARS_YELLOW
+    btnColors[3]
   );
 
   lcarsBox(
@@ -180,21 +191,21 @@ void drawScreen() {
     10, 0,
     -1, 0,
     0, 0,
-    LCARS_YELLOW
+    btnColors[3]
   );
 
   lcarsBox(
     144, 254,
     164, 260,
     0, 0, 0, 0, 0, 0,
-    LCARS_BLUE
+    btnColors[4]
   );
 
   lcarsBox(
     168, 254,
     240, 260,
     0, 0, 0, 0, 0, 0,
-    LCARS_YELLOW
+    btnColors[5]
   );
 
   lcarsBox(
@@ -203,7 +214,7 @@ void drawScreen() {
     20, 0,
     1, 0,
     0, 0,
-    LCARS_ORANGE
+    btnColors[6]
   );
 
   lcarsBox(
@@ -212,21 +223,21 @@ void drawScreen() {
     10, 0,
     0, 0,
     -1, 0,
-    LCARS_ORANGE
+    btnColors[6]
   );
 
   lcarsBox(
     168, 264,
     240, 272,
     0, 0, 0, 0, 0, 0,
-    LCARS_ORANGE
+    btnColors[7]
   );
 
   lcarsBox(
     0, 288,
     40, 320,
     0, 0, 0, 0, 0, 0,
-    LCARS_ORANGE
+    btnColors[8]
   );
 }
 
@@ -311,27 +322,28 @@ void setup() {
 
   tft.init(240, 320);
   tft.fillScreen(ST77XX_BLACK);
+  drawScreen();
 
   analogWrite(PIN_TFT_BL, 255);
 
-//  int status = WL_IDLE_STATUS;
-//  while (status != WL_CONNECTED) {
-//    status = WiFi.begin(WIFI_SSID, WIFI_PASS);
-//
-//    if (WiFi.status() == WL_NO_MODULE) {
-//      Serial.println("Communication with WiFi module failed!");
-//      break;
-//    }
-//
-//    for (int i = 0; i <= 64; ++i) {
-//      analogWrite(PIN_LED_ALPHA, i);
-//      analogWrite(PIN_LED_BETA, (i+16)%64);
-//      analogWrite(PIN_LED_DELTA, (i+32)%64);
-//      analogWrite(PIN_LED_GAMMA, (i+48)%64);
-//      delay(8);
-//    }
-//  }
-//  WiFi.lowPowerMode();
+  int status = WL_IDLE_STATUS;
+  while (status != WL_CONNECTED) {
+    status = WiFi.begin(WIFI_SSID, WIFI_PASS);
+
+    if (WiFi.status() == WL_NO_MODULE) {
+      Serial.println("Communication with WiFi module failed!");
+      break;
+    }
+
+    for (int i = 0; i <= 64; ++i) {
+      analogWrite(PIN_LED_ALPHA, i);
+      analogWrite(PIN_LED_BETA, (i+16)%64);
+      analogWrite(PIN_LED_DELTA, (i+32)%64);
+      analogWrite(PIN_LED_GAMMA, (i+48)%64);
+      delay(8);
+    }
+  }
+  WiFi.lowPowerMode();
 
   Serial.println("OK!");
 
@@ -348,11 +360,24 @@ void setup() {
   const uint8_t partialArea[] = {0, 0, 0, 195};
   tft.sendCommand(ST7789_PTLAR, partialArea, 4);
   tft.sendCommand(ST7789_PTLON);
-
-  drawScreen();
 }
 
+int nextColorChangeTime = 0;
+
 void loop() {
+  if (millis() >= nextColorChangeTime) {
+    uint16_t newColor;
+    switch (random(4)) {
+      case 0: newColor = LCARS_ORANGE; break;
+      case 1: newColor = LCARS_RED; break;
+      case 2: newColor = LCARS_BLUE; break;
+      default: newColor = LCARS_YELLOW; break;
+    }
+    btnColors[random(NUM_BTN_COLORS)] = newColor;
+    drawScreen();
+    nextColorChangeTime = millis() + random(800, 2000);
+  }
+
   int geoValue = analogRead(PIN_BTN_GEO);
   int metValue = analogRead(PIN_BTN_MET);
   int bioValue = analogRead(PIN_BTN_BIO);
