@@ -47,15 +47,13 @@ Adafruit_ZeroI2S i2s = Adafruit_ZeroI2S();
 WiFiClient client;
 
 void playAudio16(const uint8_t* buffer, uint32_t length) {
-  for (uint32_t i=0; i<length/2; i++) {
+  delay(3);
+  for (uint32_t i=0; i<length; i += 2) {
     // Can't seem to run I2S in 16-bit mode, so let's run it in 32-bit mode
     // and transform our 16-bit sample to 32-bit.
-    int32_t sample = ((uint16_t*)buffer)[i] << 16;
+    int32_t sample = (buffer[i+1] << 24) | (buffer[i] << 16);
     i2s.write(sample, sample);
   }
-  // For some reason, it crashes if we don't print something to serial
-  // after playing samples but before sleeping...
-  Serial.println("Samples sent");
 }
 
 void checkSleep() {
@@ -67,8 +65,7 @@ void checkSleep() {
   Serial.println("Sleep");
   analogWrite(PIN_TFT_BL, 0);
   playAudio16(tng_tricorder_close_wav, TNG_TRICORDER_CLOSE_WAV_LEN);
-  //playWave(sawtooth, WAV_SIZE, scale[3], 0.25);
-  delay(120); // From ST7789 docs, need 120ms between SLPOUT and SLPIN
+  delay(120); // From ST7789 docs, need 120ms between last SLPOUT and SLPIN
   tft.sendCommand(ST7789_SLPIN);
   USBDevice.detach();
 
@@ -79,12 +76,11 @@ void checkSleep() {
     detachInterrupt(PIN_MAGNET);
   }
 
+  USBDevice.attach();
   analogWrite(PIN_TFT_BL, 255);
   delay(5); // From ST7789 docs, need 5ms between last SLPIN and SLPOUT
   tft.sendCommand(ST7789_SLPOUT);
-  USBDevice.attach();
   playAudio16(tng_tricorder_open_wav, TNG_TRICORDER_OPEN_WAV_LEN);
-  //playWave(sawtooth, WAV_SIZE, scale[8], 0.25);
 }
 
 void wakeupInterruptCallback() {
@@ -125,6 +121,81 @@ void setHassSwitch(const char* entityName, bool targetState) {
   client.stop();
 }
 
+void drawScreen() {
+  // Drawable points from 0, 124 to 240, 320
+
+  tft.fillScreen(ST77XX_BLACK);
+
+  lcarsBox(
+    20, 164,
+    220, 260,
+    50, 10,
+    -1, 1,
+    -1, 1,
+    ST77XX_GREEN
+  );
+}
+
+
+// Based on Adafruit GFX fillCircleHelper
+void lcarsBoxSideHelper(int16_t x0, int16_t y0, int16_t r,
+                      int16_t h, bool left,
+                      int8_t topMode, int8_t bottomMode,
+                      uint16_t color) {
+  int16_t f = 1 - r;
+  int16_t ddF_x = 1;
+  int16_t ddF_y = -2 * r;
+  int16_t x = 0;
+  int16_t y = r;
+  int16_t px = x;
+  int16_t py = y;
+  int16_t delta =  h - 2 * r - 1;
+
+  delta++; // Avoid some +1's in the loop
+
+  while (x < y) {
+    if (f >= 0) {
+      y--;
+      ddF_y += 2;
+      f += ddF_y;
+    }
+    x++;
+    ddF_x += 2;
+    f += ddF_x;
+    if (x < (y + 1)) {
+      int16_t lineX = left ? x0 - x : x0 + x;
+      int16_t lineY0 = topMode == 0 ? y0 - r : (topMode < 0 ? y0 - r*2 + y : y0 - y);
+      int16_t lineY1 = bottomMode == 0 ? y0 - r + h : (bottomMode < 0 ? y0 + h - y : y0 + y + delta);
+      tft.writeFastVLine(lineX, lineY0, lineY1-lineY0, color);
+    }
+    if (y != py) {
+      int16_t lineX = left ? x0 - py : x0 + py;
+      int16_t lineY0 = topMode == 0 ? y0 - r : (topMode < 0 ? y0 - r*2 + px : y0 - px);
+      int16_t lineY1 = bottomMode == 0? y0 - r + h : (bottomMode < 0 ? y0 + h - px : y0 + px + delta);
+      tft.writeFastVLine(lineX, lineY0, lineY1-lineY0, color);
+      py = y;
+    }
+    px = x;
+  }
+}
+
+void lcarsBox(
+  uint16_t x0, uint16_t y0,
+  uint16_t x1, uint16_t y1,
+  int16_t r0, int16_t r1,
+  int8_t topLeftMode, int8_t topRightMode,
+  int8_t bottomLeftMode, int8_t bottomRightMode,
+  uint16_t color
+) {
+  tft.startWrite();
+  int w = x1-x0;
+  int h = y1-y0;
+  lcarsBoxSideHelper(x0 + r0, y0 + r0, r0, h, true, topLeftMode, bottomLeftMode, color);
+  tft.writeFillRect(x0 + r0, y0, w - (r0 + r1), h, color);
+  lcarsBoxSideHelper(x0 + w - r1 - 1, y0 + r1, r1, h, false, topRightMode, bottomRightMode, color);
+  tft.endWrite();
+}
+
 void setup() {
   pinMode(PIN_SWITCH, INPUT_PULLUP);
   pinMode(PIN_MAGNET, INPUT_PULLUP);
@@ -149,25 +220,24 @@ void setup() {
 
   analogWrite(PIN_TFT_BL, 255);
 
-  int status = WL_IDLE_STATUS;
-  while (status != WL_CONNECTED) {
-    status = WiFi.begin(WIFI_SSID, WIFI_PASS);
-
-    if (WiFi.status() == WL_NO_MODULE) {
-      Serial.println("Communication with WiFi module failed!");
-      break;
-    }
-    
-    for (int i = 0; i <= 64; ++i) {
-      analogWrite(PIN_LED_ALPHA, i);
-      analogWrite(PIN_LED_BETA, (i+16)%64);
-      analogWrite(PIN_LED_DELTA, (i+32)%64);
-      analogWrite(PIN_LED_GAMMA, (i+48)%64);
-      delay(8);
-    }
-  }
-
-  WiFi.lowPowerMode();
+//  int status = WL_IDLE_STATUS;
+//  while (status != WL_CONNECTED) {
+//    status = WiFi.begin(WIFI_SSID, WIFI_PASS);
+//
+//    if (WiFi.status() == WL_NO_MODULE) {
+//      Serial.println("Communication with WiFi module failed!");
+//      break;
+//    }
+//
+//    for (int i = 0; i <= 64; ++i) {
+//      analogWrite(PIN_LED_ALPHA, i);
+//      analogWrite(PIN_LED_BETA, (i+16)%64);
+//      analogWrite(PIN_LED_DELTA, (i+32)%64);
+//      analogWrite(PIN_LED_GAMMA, (i+48)%64);
+//      delay(8);
+//    }
+//  }
+//  WiFi.lowPowerMode();
 
   Serial.println("OK!");
 
@@ -184,26 +254,20 @@ void setup() {
   const uint8_t partialArea[] = {0, 0, 0, 195};
   tft.sendCommand(ST7789_PTLAR, partialArea, 4);
   tft.sendCommand(ST7789_PTLON);
+
+  drawScreen();
 }
 
 void loop() {
-  int switchValue = digitalRead(PIN_SWITCH);
-
-  if (switchValue == 1) {
-    tft.fillScreen(ST77XX_GREEN);
-  } else {
-    tft.fillScreen(ST77XX_RED);
-  }
-
   int geoValue = analogRead(PIN_BTN_GEO);
   int metValue = analogRead(PIN_BTN_MET);
   int bioValue = analogRead(PIN_BTN_BIO);
 
-  if (metValue < 50) {
-    setHassSwitch("switch.corner_lamp", false);
-  } else if (bioValue < 50) {
-    setHassSwitch("switch.corner_lamp", true);
-  }
+//  if (metValue < 50) {
+//    setHassSwitch("switch.corner_lamp", false);
+//  } else if (bioValue < 50) {
+//    setHassSwitch("switch.corner_lamp", true);
+//  }
 
   if (millis() > 3000) {
     checkSleep();
