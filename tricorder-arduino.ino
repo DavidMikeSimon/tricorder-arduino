@@ -39,6 +39,11 @@
 #define PIN_TFT_DC    11
 #define PIN_TFT_CS    12
 
+#define LCARS_ORANGE    0xFCA6
+#define LCARS_BLUE      0x333F
+#define LCARS_YELLOW    0xFFF2
+#define LCARS_RED       0xD328
+
 Adafruit_ST7789 tft = Adafruit_ST7789(PIN_TFT_CS, PIN_TFT_DC, -1);
 
 // Use default pins in board variant
@@ -127,12 +132,101 @@ void drawScreen() {
   tft.fillScreen(ST77XX_BLACK);
 
   lcarsBox(
-    20, 164,
-    220, 260,
-    50, 10,
-    -1, 1,
-    -1, 1,
-    ST77XX_GREEN
+    0, 124,
+    40, 184,
+    20, 0,
+    1, 0,
+    0, 0,
+    LCARS_ORANGE
+  );
+
+  lcarsBox(
+    40, 124,
+    140, 135,
+    20, 0,
+    0, 0,
+    -1, 0,
+    LCARS_ORANGE
+  );
+
+  lcarsBox(
+    144, 124,
+    240, 135,
+    0, 5,
+    0, 1,
+    0, 1,
+    LCARS_RED
+  );
+
+  lcarsBox(
+    0, 188,
+    40, 204,
+    0, 0, 0, 0, 0, 0,
+    LCARS_ORANGE
+  );
+
+  lcarsBox(
+    0, 208,
+    40, 260,
+    20, 0,
+    0, 0,
+    1, 0,
+    LCARS_YELLOW
+  );
+
+  lcarsBox(
+    40, 254,
+    140, 260,
+    10, 0,
+    -1, 0,
+    0, 0,
+    LCARS_YELLOW
+  );
+
+  lcarsBox(
+    144, 254,
+    164, 260,
+    0, 0, 0, 0, 0, 0,
+    LCARS_BLUE
+  );
+
+  lcarsBox(
+    168, 254,
+    240, 260,
+    0, 0, 0, 0, 0, 0,
+    LCARS_YELLOW
+  );
+
+  lcarsBox(
+    0, 264,
+    40, 284,
+    20, 0,
+    1, 0,
+    0, 0,
+    LCARS_ORANGE
+  );
+
+  lcarsBox(
+    40, 264,
+    164, 272,
+    10, 0,
+    0, 0,
+    -1, 0,
+    LCARS_ORANGE
+  );
+
+  lcarsBox(
+    168, 264,
+    240, 272,
+    0, 0, 0, 0, 0, 0,
+    LCARS_ORANGE
+  );
+
+  lcarsBox(
+    0, 288,
+    40, 320,
+    0, 0, 0, 0, 0, 0,
+    LCARS_ORANGE
   );
 }
 
@@ -216,7 +310,7 @@ void setup() {
   //while (!Serial) delay(10);
 
   tft.init(240, 320);
-  tft.fillScreen(ST77XX_ORANGE);
+  tft.fillScreen(ST77XX_BLACK);
 
   analogWrite(PIN_TFT_BL, 255);
 
