@@ -1,6 +1,11 @@
+// These are necessary to convince Adafruit_TFTSPI to use DMA
+#define ARDUINO_SAMD_ZERO
+#define USE_SPI_DMA
+
 #include <Arduino.h>
 #include <ArduinoLowPower.h>
 #include <SPI.h>
+#include <Adafruit_ZeroDMA.h>
 #include <Adafruit_ZeroI2S.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_ST7789.h>
@@ -145,6 +150,7 @@ int curSel = 0;
 
 void drawScreen() {
   // Drawable points from 0, 124 to 240, 320
+  int start = millis();
 
   lcarsBox(
     0, 124,
@@ -246,12 +252,16 @@ void drawScreen() {
 
   for (int i = 0; i < NUM_BUTTONS; ++i) {
     lcarsBox(
-      60, 140 + i*30,
-      140, 140 + i*30 + 20,
+      60, 140 + i*25,
+      140, 140 + i*25 + 20,
       10, 10, 1, 1, 1, 1,
       curSel == i ? LCARS_BLUE : LCARS_ORANGE
     );
   }
+
+  int end = millis();
+  Serial.print("Elapsed: ");
+  Serial.println(end - start);
 }
 
 
@@ -371,6 +381,12 @@ void setup() {
   const uint8_t partialArea[] = {0, 0, 0, 195};
   tft.sendCommand(ST7789_PTLAR, partialArea, 4);
   tft.sendCommand(ST7789_PTLON);
+
+  Serial.println("_ CHECKING FOR DMA");
+  #if defined(USE_SPI_DMA) && (defined(__SAMD51__) || defined(ARDUINO_SAMD_ZERO))
+  Serial.println("DMA ON");
+  #endif
+  Serial.println("^ CHECKING FOR DMA");
 }
 
 int nextColorChangeTime = 0;
@@ -415,19 +431,20 @@ void loop() {
       buttonDown = 1;
 
       if (button == PIN_BTN_GEO) {
-        Serial.println(curSel);
+        curSel -= 1;
       }
       if (button == PIN_BTN_MET) {
-        curSel += 1;
+        Serial.println(curSel);
       }
       if (button == PIN_BTN_BIO) {
-        curSel -= 1;
+        curSel += 1;
       }
 
       if (curSel < 0) {
         curSel += NUM_BUTTONS;
       }
       curSel = curSel % NUM_BUTTONS;
+      drawScreen();
 
       nextButtonActionTime = millis() + 100;
     }
