@@ -19,8 +19,8 @@
 #define ST7789_SLPOUT 0x11
 
 #define PIN_BTN_GEO   PIN_A0
-#define PIN_BTN_MET   PIN_A1
-#define PIN_BTN_BIO   PIN_A2
+#define PIN_BTN_BIO   PIN_A1
+#define PIN_BTN_MET   PIN_A2
 #define PIN_JOY_UP    PIN_A3
 #define PIN_LED_GAMMA PIN_A4
 #define PIN_JOY_DOWN  PIN_A5
@@ -139,6 +139,10 @@ int btnColors[NUM_BTN_COLORS] = {
   LCARS_ORANGE
 };
 
+int curSel = 0;
+
+#define NUM_BUTTONS 4
+
 void drawScreen() {
   // Drawable points from 0, 124 to 240, 320
 
@@ -239,6 +243,15 @@ void drawScreen() {
     0, 0, 0, 0, 0, 0,
     btnColors[8]
   );
+
+  for (int i = 0; i < NUM_BUTTONS; ++i) {
+    lcarsBox(
+      60, 140 + i*30,
+      140, 140 + i*30 + 20,
+      10, 10, 1, 1, 1, 1,
+      curSel == i ? LCARS_BLUE : LCARS_ORANGE
+    );
+  }
 }
 
 
@@ -304,8 +317,8 @@ void lcarsBox(
 void setup() {
   pinMode(PIN_SWITCH, INPUT_PULLUP);
   pinMode(PIN_MAGNET, INPUT_PULLUP);
-  pinMode(PIN_BTN_GEO, INPUT);
-  pinMode(PIN_BTN_MET, INPUT);
+  pinMode(PIN_BTN_GEO, INPUT_PULLUP);
+  pinMode(PIN_BTN_MET, INPUT_PULLUP);
   pinMode(PIN_BTN_BIO, INPUT_PULLUP);
   pinMode(PIN_JOY_UP, INPUT_PULLUP);
   pinMode(PIN_JOY_DOWN, INPUT_PULLUP);
@@ -345,8 +358,6 @@ void setup() {
   }
   WiFi.lowPowerMode();
 
-  Serial.println("OK!");
-
   analogWrite(PIN_LED_ALPHA, 0);
   analogWrite(PIN_LED_BETA, 0);
   analogWrite(PIN_LED_DELTA, 0);
@@ -364,6 +375,9 @@ void setup() {
 
 int nextColorChangeTime = 0;
 
+int nextButtonActionTime = 0;
+int buttonDown = 0;
+
 void loop() {
   if (millis() >= nextColorChangeTime) {
     uint16_t newColor;
@@ -378,19 +392,50 @@ void loop() {
     nextColorChangeTime = millis() + random(800, 2000);
   }
 
-  int geoValue = analogRead(PIN_BTN_GEO);
-  int metValue = analogRead(PIN_BTN_MET);
-  int bioValue = analogRead(PIN_BTN_BIO);
+  if (millis() > nextButtonActionTime) {
+    int geoValue = !digitalRead(PIN_BTN_GEO);
+    int metValue = !digitalRead(PIN_BTN_MET);
+    int bioValue = !digitalRead(PIN_BTN_BIO);
 
-//  if (metValue < 50) {
-//    setHassSwitch("switch.corner_lamp", false);
-//  } else if (bioValue < 50) {
-//    setHassSwitch("switch.corner_lamp", true);
-//  }
+    int button = -100;
+
+    if (geoValue) {
+      button = PIN_BTN_GEO;
+    } else if (metValue) {
+      button = PIN_BTN_MET;
+    } else if (bioValue) {
+      button = PIN_BTN_BIO;
+    }
+
+    if (buttonDown == 1) {
+      if (button == -100) {
+        buttonDown = 0;
+      }
+    } else if (button != -100) {
+      buttonDown = 1;
+
+      if (button == PIN_BTN_GEO) {
+        Serial.println(curSel);
+      }
+      if (button == PIN_BTN_MET) {
+        curSel += 1;
+      }
+      if (button == PIN_BTN_BIO) {
+        curSel -= 1;
+      }
+
+      if (curSel < 0) {
+        curSel += NUM_BUTTONS;
+      }
+      curSel = curSel % NUM_BUTTONS;
+
+      nextButtonActionTime = millis() + 100;
+    }
+  }
 
   if (millis() > 3000) {
     checkSleep();
   }
 
-  delay(100);
+  delay(20);
 }
