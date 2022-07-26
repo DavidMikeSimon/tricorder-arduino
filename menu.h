@@ -98,7 +98,7 @@ struct LcarsWidget {
   uint16_t color;
   LcarsWidgetBox* firstBox;
   bool dirty;
-  uint16_t id;
+  void (*callback)();
 };
 
 void drawWidget(const LcarsWidget* widget) {
@@ -140,6 +140,30 @@ void drawWidget(const LcarsWidget* widget) {
 int numWidgets = 0;
 LcarsWidget widgets[MAX_WIDGETS];
 
+int getNumWidgetsOfType(LcarsWidgetType type) {
+  int num = 0;
+  for (size_t i = 0; i < numWidgets; ++i) {
+    if (widgets[i].type == type) {
+      num++;
+    }
+  }
+  return num;
+}
+
+size_t getNthWidgetIdxOfType(LcarsWidgetType type, int n) {
+  size_t idx = 0;
+  size_t found = 0;
+  while (true) {
+    if (widgets[idx].type == type) {
+      found++;
+      if (found > n) {
+        return idx;
+      }
+    }
+    idx++;
+  }
+}
+
 void drawDirtyWidgets() {
   for (size_t i = 0; i < numWidgets; ++i) {
     if (widgets[i].dirty) {
@@ -156,13 +180,7 @@ void changeRandomColor() {
     return;
   }
 
-  uint16_t numDecoWidgets = 0;
-  for (size_t i = 0; i < numWidgets; ++i) {
-    if (widgets[i].type == LCARS_WIDGET_DECO) {
-      numDecoWidgets++;
-    }
-  }
-
+  uint16_t numDecoWidgets = getNumWidgetsOfType(LCARS_WIDGET_DECO);
   if (numDecoWidgets == 0) {
     return;
   }
@@ -175,17 +193,7 @@ void changeRandomColor() {
     default: newColor = LCARS_YELLOW; break;
   }
 
-  uint16_t selectedWidgetOffset = random(numDecoWidgets);
-  uint16_t widgetIdx = 0;
-  while (selectedWidgetOffset > 0) {
-    if (widgets[widgetIdx].type == LCARS_WIDGET_DECO) {
-      selectedWidgetOffset--;
-    }
-    widgetIdx++;
-    if (widgetIdx == numWidgets) {
-      widgetIdx = 0;
-    }
-  }
+  uint16_t widgetIdx = getNthWidgetIdxOfType(LCARS_WIDGET_DECO, random(numDecoWidgets));
   widgets[widgetIdx].color = newColor;
   widgets[widgetIdx].dirty = true;
 
@@ -199,8 +207,8 @@ void resetWidgets() {
   numWidgets = 0;
 }
 
-void addWidget(LcarsWidgetType type, uint16_t color, uint16_t id = 0) {
-  widgets[numWidgets] = { type, color, NULL, true, id };
+void addWidget(LcarsWidgetType type, uint16_t color, void (*callback)() = NULL) {
+  widgets[numWidgets] = { type, color, NULL, true, callback };
   numWidgets++;
 }
 
@@ -218,8 +226,32 @@ void addWidgetBox(LcarsWidgetBox newBox) {
   }
 }
 
+void addButton(const char* label, void (*callback)()) {
+  int i = getNumWidgetsOfType(LCARS_WIDGET_BUTTON);
+  addWidget(LCARS_WIDGET_BUTTON, i == 0 ? LCARS_ORANGE : LCARS_BLUE, callback);
+  addWidgetBox({
+    50 + (i/5)*64, 16 + (i%5)*25,
+    110 + (i/5)*64, 16 + (i%5)*25 + 20,
+    10, 10,
+    LCARS_ALL_BEVEL_IN,
+    label,
+    NULL
+  });
+}
+
+void cornerLampOff() {
+  setHassSwitch("switch.corner_lamp", false);
+}
+
+void cornerLampOn() {
+  setHassSwitch("switch.corner_lamp", true);
+}
+
 void setupMainMenu() {
   resetWidgets();
+
+  addButton("L OFF", &cornerLampOff);
+  addButton("L ON", &cornerLampOn);
 
   addWidget(LCARS_WIDGET_DECO, LCARS_ORANGE);
   addWidgetBox({
@@ -268,34 +300,34 @@ void setupMainMenu() {
     NULL,
     NULL
   });
-  addWidgetBox({
-    40, 130,
-    140, 136,
-    10, 0,
-    LCARS_TOP_LEFT_BEVEL_OUT,
-    NULL,
-    NULL
-  });
-
-  addWidget(LCARS_WIDGET_DECO, LCARS_BLUE);
-  addWidgetBox({
-    144, 130,
-    164, 136,
-    0, 0,
-    0,
-    NULL,
-    NULL
-  });
-
-  addWidget(LCARS_WIDGET_DECO, LCARS_YELLOW);
-  addWidgetBox({
-    168, 130,
-    240, 136,
-    0, 0,
-    0,
-    NULL,
-    NULL
-  });
+//  addWidgetBox({
+//    40, 130,
+//    140, 136,
+//    10, 0,
+//    LCARS_TOP_LEFT_BEVEL_OUT,
+//    NULL,
+//    NULL
+//  });
+//
+//  addWidget(LCARS_WIDGET_DECO, LCARS_BLUE);
+//  addWidgetBox({
+//    144, 130,
+//    164, 136,
+//    0, 0,
+//    0,
+//    NULL,
+//    NULL
+//  });
+//
+//  addWidget(LCARS_WIDGET_DECO, LCARS_YELLOW);
+//  addWidgetBox({
+//    168, 130,
+//    240, 136,
+//    0, 0,
+//    0,
+//    NULL,
+//    NULL
+//  });
 
   addWidget(LCARS_WIDGET_DECO, LCARS_ORANGE);
   addWidgetBox({
@@ -325,56 +357,40 @@ void setupMainMenu() {
     NULL
   });
   
-  addWidget(LCARS_WIDGET_DECO, LCARS_ORANGE);
+  addWidget(LCARS_WIDGET_DECO, LCARS_RED);
   addWidgetBox({
     0, 164,
-    40, 196,
+    44, 196,
     0, 0,
     0,
     "BK",
     NULL,
   });
 
-  for (int i = 0; i < 4; ++i) {
-    addWidget(LCARS_WIDGET_BUTTON, i == 0 ? LCARS_ORANGE : LCARS_BLUE, (i+1)*100);
-    addWidgetBox({
-      60, 16 + i*25,
-      140, 16 + i*25 + 20,
-      10, 10,
-      LCARS_ALL_BEVEL_IN,
-      "FOO",
-      NULL
-    });
-  }
+  addWidget(LCARS_WIDGET_DECO, LCARS_BLUE);
+  addWidgetBox({
+    48, 164,
+    130, 196,
+    0, 0,
+    0,
+    "SEL",
+    NULL,
+  });
+
+  addWidget(LCARS_WIDGET_DECO, LCARS_YELLOW);
+  addWidgetBox({
+    134, 164,
+    216, 196,
+    0, 0,
+    0,
+    "NXT",
+    NULL,
+  });
 }
 
 int nextButtonActionTime = 0;
 int buttonDown = 0;
 int curButton = 0;
-
-int getNumButtons() {
-  int numButtons = 0;
-  for (size_t i = 0; i < numWidgets; ++i) {
-    if (widgets[i].type == LCARS_WIDGET_BUTTON) {
-      numButtons++;
-    }
-  }
-  return numButtons;
-}
-
-size_t getNthButtonIdx(int n) {
-  size_t idx = 0;
-  size_t found = 0;
-  while (true) {
-    if (widgets[idx].type == LCARS_WIDGET_BUTTON) {
-      found++;
-      if (found > n) {
-        return idx;
-      }
-    }
-    idx++;
-  }
-}
 
 void checkInput() {
   if (millis() < nextButtonActionTime) {
@@ -403,7 +419,7 @@ void checkInput() {
     buttonDown = 1;
     nextButtonActionTime = millis() + 100;
 
-    int numButtons = getNumButtons();
+    int numButtons = getNumWidgetsOfType(LCARS_WIDGET_BUTTON);
 
     if (numButtons == 0) {
       return;
@@ -415,7 +431,10 @@ void checkInput() {
       curButton -= 1;
     }
     if (button == PIN_BTN_MET) {
-      Serial.println(widgets[getNthButtonIdx(curButton)].id);
+      void (*callback)() = widgets[getNthWidgetIdxOfType(LCARS_WIDGET_BUTTON, curButton)].callback;
+      if (callback != NULL) {
+        callback();
+      }
     }
     if (button == PIN_BTN_BIO) {
       curButton += 1;
@@ -427,8 +446,8 @@ void checkInput() {
     curButton %= numButtons;
 
     if (curButton != lastButton) {
-      size_t lastButtonIdx = getNthButtonIdx(lastButton);
-      size_t curButtonIdx = getNthButtonIdx(curButton);
+      size_t lastButtonIdx = getNthWidgetIdxOfType(LCARS_WIDGET_BUTTON, lastButton);
+      size_t curButtonIdx = getNthWidgetIdxOfType(LCARS_WIDGET_BUTTON, curButton);
       widgets[lastButtonIdx].color = LCARS_BLUE;
       widgets[lastButtonIdx].dirty = true;
       widgets[curButtonIdx].color = LCARS_ORANGE;

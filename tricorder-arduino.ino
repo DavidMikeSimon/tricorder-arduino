@@ -42,8 +42,9 @@ Adafruit_ST7789 tft = Adafruit_ST7789(PIN_TFT_CS, PIN_TFT_DC, -1);
 Adafruit_ZeroI2S i2s = Adafruit_ZeroI2S();
 WiFiClient client;
 
-#include "menu.h"
 #include "secrets.h"
+#include "hass.h"
+#include "menu.h"
 #include "sounds/tng_tricorder_close.wav.h"
 #include "sounds/tng_tricorder_open.wav.h"
 //#include "sounds/tng_tricorder_scan.wav.h"
@@ -90,40 +91,6 @@ void wakeupInterruptCallback() {
   // Do nothing
 }
 
-void setHassSwitch(const char* entityName, bool targetState) {
-  Serial.println("setHassSwitch");
-  char reqBodyBuffer[256];
-  int reqBodyLen = sprintf(
-    reqBodyBuffer,
-    "{\"entity_id\":\"%s\"}\r\n\r\n",
-    entityName
-  );
-
-  char reqHeaderBuffer[512];
-  int reqHeaderLen = sprintf(
-    reqHeaderBuffer,
-    "POST /api/services/switch/turn_%s HTTP/1.0\r\n"
-    "Content-Type: application/json\r\n"
-    "Content-Length: %u\r\n"
-    "Authorization: Bearer %s\r\n"
-    "Connection: close\r\n"
-    "\r\n",
-    targetState ? "on" : "off",
-    reqBodyLen,
-    HOME_ASSISTANT_API_KEY
-  );
-
-
-  if (!client.connect(HOME_ASSISTANT_HOST, HOME_ASSISTANT_PORT)) {
-    Serial.println("Connection failed");
-    return;
-  }
-
-  client.write(reqHeaderBuffer, reqHeaderLen);
-  client.write(reqBodyBuffer, reqBodyLen);
-  client.stop();
-}
-
 void setup() {
   pinMode(PIN_SWITCH, INPUT_PULLUP);
   pinMode(PIN_MAGNET, INPUT_PULLUP);
@@ -155,27 +122,33 @@ void setup() {
 
   analogWrite(PIN_TFT_BL, 255);
 
-//  Serial.println("Connecting to WiFi");
-//  int status = WL_IDLE_STATUS;
-//  while (status != WL_CONNECTED) {
-//    status = WiFi.begin(WIFI_SSID, WIFI_PASS);
-//
-//    if (status == WL_NO_MODULE) {
-//      Serial.println("Communication with WiFi module failed!");
-//      break;
-//    }
-//
-//    for (int i = 0; i <= 64; ++i) {
-//      analogWrite(PIN_LED_ALPHA, i);
-//      analogWrite(PIN_LED_BETA, (i+16)%64);
-//      analogWrite(PIN_LED_DELTA, (i+32)%64);
-//      analogWrite(PIN_LED_GAMMA, (i+48)%64);
-//      delay(8);
-//    }
-//    Serial.print("WiFi status: ");
-//    Serial.println(status);
-//  }
-//  WiFi.lowPowerMode();
+  Serial.println("Connecting to WiFi");
+  
+  analogWrite(PIN_LED_ALPHA, 0);
+  analogWrite(PIN_LED_BETA, 64);
+  analogWrite(PIN_LED_DELTA, 64);
+  analogWrite(PIN_LED_GAMMA, 64);
+  
+  int status = WL_IDLE_STATUS;
+  while (status != WL_CONNECTED) {
+    status = WiFi.begin(WIFI_SSID, WIFI_PASS);
+
+    if (status == WL_NO_MODULE) {
+      Serial.println("Communication with WiFi module failed!");
+      break;
+    }
+
+    for (int i = 0; i <= 64; ++i) {
+      analogWrite(PIN_LED_ALPHA, i);
+      analogWrite(PIN_LED_BETA, (i+16)%64);
+      analogWrite(PIN_LED_DELTA, (i+32)%64);
+      analogWrite(PIN_LED_GAMMA, (i+48)%64);
+      delay(8);
+    }
+    Serial.print("WiFi status: ");
+    Serial.println(status);
+  }
+  WiFi.lowPowerMode();
 
   analogWrite(PIN_LED_ALPHA, 0);
   analogWrite(PIN_LED_BETA, 0);
