@@ -240,18 +240,43 @@ void addButton(const char* label, void (*callback)()) {
 }
 
 void cornerLampOff() {
-  setHassSwitch("switch.corner_lamp", false);
+  hassEntityService("switch", "turn_off", "switch.corner_lamp");
 }
 
 void cornerLampOn() {
-  setHassSwitch("switch.corner_lamp", true);
+  hassEntityService("switch", "turn_on", "switch.corner_lamp");
+}
+
+void tvOff() {
+  hassEntityService("media_player", "turn_off", "media_player.sony_bravia_tv");
+}
+
+void tvOn() {
+  hassEntityService("media_player", "turn_on", "media_player.sony_bravia_tv");
+}
+
+void tvPlayPause() {
+  hassEntityService("script", "turn_on", "script.contextual_media_play_pause");
+}
+
+void tvVolumeUp() {
+  hassEntityService("media_player", "volume_up", "media_player.sony_bravia_tv");
+}
+
+void tvVolumeDown() {
+  hassEntityService("media_player", "volume_down", "media_player.sony_bravia_tv");
 }
 
 void setupMainMenu() {
   resetWidgets();
 
-  addButton("L OFF", &cornerLampOff);
   addButton("L ON", &cornerLampOn);
+  addButton("L OFF", &cornerLampOff);
+  addButton("SC ON", &tvOn);
+  addButton("SC OFF", &tvOff);
+  addButton("PL/PS", &tvPlayPause);
+  addButton("VOL+", &tvVolumeUp);
+  addButton("VOL-", &tvVolumeDown);
 
   addWidget(LCARS_WIDGET_DECO, LCARS_ORANGE);
   addWidgetBox({
@@ -300,34 +325,6 @@ void setupMainMenu() {
     NULL,
     NULL
   });
-//  addWidgetBox({
-//    40, 130,
-//    140, 136,
-//    10, 0,
-//    LCARS_TOP_LEFT_BEVEL_OUT,
-//    NULL,
-//    NULL
-//  });
-//
-//  addWidget(LCARS_WIDGET_DECO, LCARS_BLUE);
-//  addWidgetBox({
-//    144, 130,
-//    164, 136,
-//    0, 0,
-//    0,
-//    NULL,
-//    NULL
-//  });
-//
-//  addWidget(LCARS_WIDGET_DECO, LCARS_YELLOW);
-//  addWidgetBox({
-//    168, 130,
-//    240, 136,
-//    0, 0,
-//    0,
-//    NULL,
-//    NULL
-//  });
 
   addWidget(LCARS_WIDGET_DECO, LCARS_ORANGE);
   addWidgetBox({
