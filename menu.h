@@ -409,11 +409,11 @@ void checkInput() {
 
   int button = -100;
 
-  if (upValue) {
+  if (upValue || geoValue) {
     button = PIN_JOY_UP;
-  } else if (downValue) {
+  } else if (downValue || bioValue) {
     button = PIN_JOY_DOWN;
-  } else if (btnValue) {
+  } else if (metValue) {
     button = PIN_JOY_BTN;
   }
 
@@ -434,13 +434,16 @@ void checkInput() {
     int lastButton = curButton;
 
     if (button == PIN_JOY_UP) {
+      playAudio16(tap_wav, TAP_WAV_LEN);
       curButton -= 1;
     } else if (button == PIN_JOY_BTN) {
+      playAudio16(chirp_2_wav, CHIRP_2_WAV_LEN);
       void (*callback)() = widgets[getNthWidgetIdxOfType(LCARS_WIDGET_BUTTON, curButton)].callback;
       if (callback != NULL) {
         callback();
       }
     } else if (button == PIN_JOY_DOWN) {
+      playAudio16(tap_wav, TAP_WAV_LEN);
       curButton += 1;
     }
 

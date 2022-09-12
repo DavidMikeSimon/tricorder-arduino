@@ -15,7 +15,10 @@
 #include "sounds/tng_tricorder_close.wav.h"
 #include "sounds/tng_tricorder_open.wav.h"
 #include "sounds/tng_tricorder_scan.wav.h"
-//#include "sounds/tng_tricorder_scan_low_beep.wav.h"
+#include "sounds/tap.wav.h"
+//#include "sounds/chirp_1.wav.h"
+#include "sounds/chirp_2.wav.h"
+#include "sounds/tng_tricorder_scan_low_beep.wav.h"
 
 #define ST7789_PTLAR  0x30
 #define ST7789_PTLON  0x12
