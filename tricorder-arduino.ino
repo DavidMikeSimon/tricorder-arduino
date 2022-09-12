@@ -12,6 +12,11 @@
 #include <WiFiNINA.h>
 #include <math.h>
 
+#include "sounds/tng_tricorder_close.wav.h"
+#include "sounds/tng_tricorder_open.wav.h"
+#include "sounds/tng_tricorder_scan.wav.h"
+//#include "sounds/tng_tricorder_scan_low_beep.wav.h"
+
 #define ST7789_PTLAR  0x30
 #define ST7789_PTLON  0x12
 #define ST7789_SLPIN  0x10
@@ -43,22 +48,9 @@ Adafruit_ZeroI2S i2s = Adafruit_ZeroI2S();
 WiFiClient client;
 
 #include "secrets.h"
+#include "sound.h"
 #include "hass.h"
 #include "menu.h"
-#include "sounds/tng_tricorder_close.wav.h"
-#include "sounds/tng_tricorder_open.wav.h"
-//#include "sounds/tng_tricorder_scan.wav.h"
-//#include "sounds/tng_tricorder_scan_low_beep.wav.h"
-
-void playAudio16(const uint8_t* buffer, uint32_t length) {
-  delay(3);
-  for (uint32_t i=0; i<length; i += 2) {
-    // Can't seem to run I2S in 16-bit mode, so let's run it in 32-bit mode
-    // and transform our 16-bit sample to 32-bit.
-    int32_t sample = (buffer[i+1] << 24) | (buffer[i] << 16);
-    i2s.write(sample, sample);
-  }
-}
 
 void checkSleep() {
   int reedSwitchValue = digitalRead(PIN_MAGNET);

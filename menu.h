@@ -267,6 +267,10 @@ void tvVolumeDown() {
   hassEntityService("media_player", "volume_down", "media_player.sony_bravia_tv");
 }
 
+void scan() {
+  playAudio16(tng_tricorder_scan_wav, TNG_TRICORDER_SCAN_WAV_LEN);
+}
+
 void setupMainMenu() {
   resetWidgets();
 
@@ -277,6 +281,7 @@ void setupMainMenu() {
   addButton("PL/PS", &tvPlayPause);
   addButton("VOL+", &tvVolumeUp);
   addButton("VOL-", &tvVolumeDown);
+  addButton("SCAN", &scan);
 
   addWidget(LCARS_WIDGET_DECO, LCARS_ORANGE);
   addWidgetBox({
@@ -393,6 +398,10 @@ void checkInput() {
   if (millis() < nextButtonActionTime) {
     return;
   }
+
+  int upValue = !digitalRead(PIN_JOY_UP);
+  int downValue = !digitalRead(PIN_JOY_DOWN);
+  int btnValue = !digitalRead(PIN_JOY_BTN);
   
   int geoValue = !digitalRead(PIN_BTN_GEO);
   int metValue = !digitalRead(PIN_BTN_MET);
@@ -400,12 +409,12 @@ void checkInput() {
 
   int button = -100;
 
-  if (geoValue) {
-    button = PIN_BTN_GEO;
-  } else if (metValue) {
-    button = PIN_BTN_MET;
-  } else if (bioValue) {
-    button = PIN_BTN_BIO;
+  if (upValue) {
+    button = PIN_JOY_UP;
+  } else if (downValue) {
+    button = PIN_JOY_DOWN;
+  } else if (btnValue) {
+    button = PIN_JOY_BTN;
   }
 
   if (buttonDown == 1) {
@@ -424,23 +433,22 @@ void checkInput() {
 
     int lastButton = curButton;
 
-    if (button == PIN_BTN_GEO) {
+    if (button == PIN_JOY_UP) {
       curButton -= 1;
-    }
-    if (button == PIN_BTN_MET) {
+    } else if (button == PIN_JOY_BTN) {
       void (*callback)() = widgets[getNthWidgetIdxOfType(LCARS_WIDGET_BUTTON, curButton)].callback;
       if (callback != NULL) {
         callback();
       }
-    }
-    if (button == PIN_BTN_BIO) {
+    } else if (button == PIN_JOY_DOWN) {
       curButton += 1;
     }
 
     if (curButton < 0) {
       curButton += numButtons;
+    } else {
+      curButton %= numButtons;
     }
-    curButton %= numButtons;
 
     if (curButton != lastButton) {
       size_t lastButtonIdx = getNthWidgetIdxOfType(LCARS_WIDGET_BUTTON, lastButton);
