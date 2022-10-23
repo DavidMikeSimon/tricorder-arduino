@@ -77,9 +77,10 @@ void audioPoll() {
   if (sourcePtr + EFFECTIVE_AUDIO_BUFSIZE >= audioSourceBuffer + audioSourceLength) {
     writeLength = audioSourceLength % EFFECTIVE_AUDIO_BUFSIZE;
     if (sourcePtr >= audioSourceBuffer + audioSourceLength) {
-      soundDMA.abort();
       if (audioLooping) {
-        playAudio16(audioSourceBuffer, audioSourceLength, true);
+        buffersPlayed = buffersPlayed % 2;
+      } else {
+        soundDMA.abort();
       }
     }
   }
