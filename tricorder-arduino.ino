@@ -47,8 +47,9 @@
 #define PIN_TFT_CS    12
 
 Adafruit_ST7789 tft = Adafruit_ST7789(PIN_TFT_CS, PIN_TFT_DC, -1);
-Adafruit_ZeroI2S i2s = Adafruit_ZeroI2S();
+
 WiFiClient client;
+
 
 #include "secrets.h"
 #include "sound.h"
@@ -103,7 +104,7 @@ void setup() {
   pinMode(PIN_TFT_BL, OUTPUT);
     
   Serial.begin(9600);
-  //while (!Serial) delay(10);
+  while (!Serial) delay(10);
 
   tft.init(240, 320);
   const uint8_t partialArea[] = {0, 0, 0, 195};
@@ -124,25 +125,25 @@ void setup() {
   analogWrite(PIN_LED_DELTA, 64);
   analogWrite(PIN_LED_GAMMA, 64);
   
-  int status = WL_IDLE_STATUS;
-  while (status != WL_CONNECTED) {
-    status = WiFi.begin(WIFI_SSID, WIFI_PASS);
-
-    if (status == WL_NO_MODULE) {
-      Serial.println("Communication with WiFi module failed!");
-      break;
-    }
-
-    for (int i = 0; i <= 64; ++i) {
-      analogWrite(PIN_LED_ALPHA, i);
-      analogWrite(PIN_LED_BETA, (i+16)%64);
-      analogWrite(PIN_LED_DELTA, (i+32)%64);
-      analogWrite(PIN_LED_GAMMA, (i+48)%64);
-      delay(8);
-    }
-    Serial.print("WiFi status: ");
-    Serial.println(status);
-  }
+//  int status = WL_IDLE_STATUS;
+//  while (status != WL_CONNECTED) {
+//    status = WiFi.begin(WIFI_SSID, WIFI_PASS);
+//
+//    if (status == WL_NO_MODULE) {
+//      Serial.println("Communication with WiFi module failed!");
+//      break;
+//    }
+//
+//    for (int i = 0; i <= 64; ++i) {
+//      analogWrite(PIN_LED_ALPHA, i);
+//      analogWrite(PIN_LED_BETA, (i+16)%64);
+//      analogWrite(PIN_LED_DELTA, (i+32)%64);
+//      analogWrite(PIN_LED_GAMMA, (i+48)%64);
+//      delay(8);
+//    }
+//    Serial.print("WiFi status: ");
+//    Serial.println(status);
+//  }
   WiFi.lowPowerMode();
 
   analogWrite(PIN_LED_ALPHA, 0);
@@ -150,20 +151,18 @@ void setup() {
   analogWrite(PIN_LED_DELTA, 0);
   analogWrite(PIN_LED_GAMMA, 0);
 
-  if (!i2s.begin(I2S_32_BIT, 22050)) {
-    Serial.println("Unable to initialize I2S");
-  }
-  i2s.enableTx();
+  soundSetup();
 }
 
 
 void loop() {
   changeRandomColor();
   checkInput();
+  audioPoll();
 
   if (millis() > 3000) {
     checkSleep();
   }
 
-  delay(20);
+  delay(1);
 }

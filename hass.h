@@ -1,4 +1,5 @@
 void sendHassCommand(const char* url, const char* body) {
+  return;
   Serial.print("hass command: ");
   Serial.println(url);
 

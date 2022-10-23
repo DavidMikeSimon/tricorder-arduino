@@ -268,6 +268,7 @@ void tvVolumeDown() {
 }
 
 void scan() {
+  Serial.println("SCAN");
   playAudio16(tng_tricorder_scan_wav, TNG_TRICORDER_SCAN_WAV_LEN);
 }
 
@@ -365,7 +366,7 @@ void setupMainMenu() {
     44, 196,
     0, 0,
     0,
-    "BK",
+    "SEL",
     NULL,
   });
 
@@ -375,7 +376,7 @@ void setupMainMenu() {
     130, 196,
     0, 0,
     0,
-    "SEL",
+    "BK",
     NULL,
   });
 
@@ -390,9 +391,15 @@ void setupMainMenu() {
   });
 }
 
+
+#define MODE_MAIN_MENU 0
+#define MODE_DNA_SCAN 1
+
+int curMode = MODE_MAIN_MENU;
 int nextButtonActionTime = 0;
 int buttonDown = 0;
 int curButton = 0;
+
 
 void checkInput() {
   if (millis() < nextButtonActionTime) {
@@ -409,11 +416,11 @@ void checkInput() {
 
   int button = -100;
 
-  if (upValue || geoValue) {
+  if (upValue || metValue) {
     button = PIN_JOY_UP;
   } else if (downValue || bioValue) {
     button = PIN_JOY_DOWN;
-  } else if (metValue) {
+  } else if (geoValue) {
     button = PIN_JOY_BTN;
   }
 
@@ -437,7 +444,7 @@ void checkInput() {
       playAudio16(tap_wav, TAP_WAV_LEN);
       curButton -= 1;
     } else if (button == PIN_JOY_BTN) {
-      playAudio16(chirp_2_wav, CHIRP_2_WAV_LEN);
+      //playAudio16(chirp_2_wav, CHIRP_2_WAV_LEN);
       void (*callback)() = widgets[getNthWidgetIdxOfType(LCARS_WIDGET_BUTTON, curButton)].callback;
       if (callback != NULL) {
         callback();
