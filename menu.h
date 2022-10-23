@@ -1,6 +1,18 @@
 #include "fonts/swiss_911_ultra_compressed_12pt.h"
 #include "fonts/swiss_911_ultra_compressed_16pt.h"
 
+#define MODE_MAIN_MENU 0
+#define MODE_DNA_SCAN 1
+
+void setupMainMenu();
+void mainMenuPoll();
+void mainMenuInput(int button);
+void dnaScanSetup();
+void dnaScanPoll();
+void dnaScanInput(int button);
+
+uint8_t curMode = MODE_MAIN_MENU;
+
 // Based on Adafruit GFX fillCircleHelper
 void lcarsBoxSideHelper(int16_t x0, int16_t y0, int16_t r,
                       int16_t h, bool left,
@@ -175,6 +187,15 @@ void drawDirtyWidgets() {
 
 int nextColorChangeTime = 0;
 
+uint16_t getRandomColor() {
+   switch (random(4)) {
+    case 0: return LCARS_ORANGE;
+    case 1: return LCARS_RED;
+    case 2: return LCARS_BLUE;
+    default: return LCARS_YELLOW;
+  }
+}
+
 void changeRandomColor() {
   if (millis() < nextColorChangeTime) {
     return;
@@ -185,13 +206,7 @@ void changeRandomColor() {
     return;
   }
 
-  uint16_t newColor;
-  switch (random(4)) {
-    case 0: newColor = LCARS_ORANGE; break;
-    case 1: newColor = LCARS_RED; break;
-    case 2: newColor = LCARS_BLUE; break;
-    default: newColor = LCARS_YELLOW; break;
-  }
+  uint16_t newColor = getRandomColor();
 
   uint16_t widgetIdx = getNthWidgetIdxOfType(LCARS_WIDGET_DECO, random(numDecoWidgets));
   widgets[widgetIdx].color = newColor;
@@ -201,10 +216,26 @@ void changeRandomColor() {
   nextColorChangeTime = millis() + random(800, 2000);
 }
 
-void resetWidgets() {
-  // TODO: Reset button position
-  // TODO: Free lcars boxes
+void setMode(uint8_t newMode) {
+  for (size_t i = 0; i < numWidgets; ++i) {
+    widgets[i].dirty = false;
+  }
   numWidgets = 0;
+
+  if (newMode == MODE_MAIN_MENU) {
+    setupMainMenu();
+  } else if (newMode == MODE_DNA_SCAN) {
+    dnaScanSetup();
+  }
+
+  curMode = newMode;
+}
+
+void freeLcarsBox(LcarsWidgetBox* box) {
+  if (box->nextBox != NULL) {
+    freeLcarsBox(box->nextBox);
+  }
+  free(box);
 }
 
 void addWidget(LcarsWidgetType type, uint16_t color, void (*callback)() = NULL) {
@@ -240,40 +271,50 @@ void addButton(const char* label, void (*callback)()) {
 }
 
 void cornerLampOff() {
+  playAudio(chirp_2_wav, CHIRP_2_WAV_LEN);
   hassEntityService("switch", "turn_off", "switch.corner_lamp");
 }
 
 void cornerLampOn() {
+  playAudio(chirp_2_wav, CHIRP_2_WAV_LEN);
   hassEntityService("switch", "turn_on", "switch.corner_lamp");
 }
 
 void tvOff() {
+  playAudio(chirp_2_wav, CHIRP_2_WAV_LEN);
   hassEntityService("media_player", "turn_off", "media_player.sony_bravia_tv");
 }
 
 void tvOn() {
+  playAudio(chirp_2_wav, CHIRP_2_WAV_LEN);
   hassEntityService("media_player", "turn_on", "media_player.sony_bravia_tv");
 }
 
 void tvPlayPause() {
+  playAudio(chirp_2_wav, CHIRP_2_WAV_LEN);
   hassEntityService("script", "turn_on", "script.contextual_media_play_pause");
 }
 
 void tvVolumeUp() {
+  playAudio(chirp_2_wav, CHIRP_2_WAV_LEN);
   hassEntityService("media_player", "volume_up", "media_player.sony_bravia_tv");
 }
 
 void tvVolumeDown() {
+  playAudio(chirp_2_wav, CHIRP_2_WAV_LEN);
   hassEntityService("media_player", "volume_down", "media_player.sony_bravia_tv");
 }
 
 void scan() {
-  Serial.println("SCAN");
-  playAudio16(tng_tricorder_scan_wav, TNG_TRICORDER_SCAN_WAV_LEN, true);
+  setMode(MODE_DNA_SCAN);
 }
 
+int curButton = 0;
+
 void setupMainMenu() {
-  resetWidgets();
+  tft.fillScreen(ST77XX_BLACK);
+
+  curButton = 0;
 
   addButton("L ON", &cornerLampOn);
   addButton("L OFF", &cornerLampOff);
@@ -335,14 +376,14 @@ void setupMainMenu() {
   addWidget(LCARS_WIDGET_DECO, LCARS_ORANGE);
   addWidgetBox({
     0, 140,
-    40, 160,
+    44, 160,
     20, 0,
     LCARS_TOP_LEFT_BEVEL_IN,
     NULL,
     NULL
   });
   addWidgetBox({
-    40, 140,
+    44, 140,
     164, 148,
     10, 0,
     LCARS_BOTTOM_LEFT_BEVEL_OUT,
@@ -391,17 +432,12 @@ void setupMainMenu() {
   });
 }
 
-
-#define MODE_MAIN_MENU 0
-#define MODE_DNA_SCAN 1
-
-int curMode = MODE_MAIN_MENU;
 int nextButtonActionTime = 0;
 int buttonDown = 0;
-int curButton = 0;
 
+void menuPoll() {
+  changeRandomColor();
 
-void checkInput() {
   if (millis() < nextButtonActionTime) {
     return;
   }
@@ -432,42 +468,58 @@ void checkInput() {
     buttonDown = 1;
     nextButtonActionTime = millis() + 100;
 
-    int numButtons = getNumWidgetsOfType(LCARS_WIDGET_BUTTON);
-
-    if (numButtons == 0) {
-      return;
-    }
-
-    int lastButton = curButton;
-
-    if (button == PIN_JOY_UP) {
-      playAudio16(tap_wav, TAP_WAV_LEN);
-      curButton -= 1;
-    } else if (button == PIN_JOY_BTN) {
-      //playAudio16(chirp_2_wav, CHIRP_2_WAV_LEN);
-      void (*callback)() = widgets[getNthWidgetIdxOfType(LCARS_WIDGET_BUTTON, curButton)].callback;
-      if (callback != NULL) {
-        callback();
-      }
-    } else if (button == PIN_JOY_DOWN) {
-      playAudio16(tap_wav, TAP_WAV_LEN);
-      curButton += 1;
-    }
-
-    if (curButton < 0) {
-      curButton += numButtons;
-    } else {
-      curButton %= numButtons;
-    }
-
-    if (curButton != lastButton) {
-      size_t lastButtonIdx = getNthWidgetIdxOfType(LCARS_WIDGET_BUTTON, lastButton);
-      size_t curButtonIdx = getNthWidgetIdxOfType(LCARS_WIDGET_BUTTON, curButton);
-      widgets[lastButtonIdx].color = LCARS_BLUE;
-      widgets[lastButtonIdx].dirty = true;
-      widgets[curButtonIdx].color = LCARS_ORANGE;
-      widgets[curButtonIdx].dirty = true;
-      drawDirtyWidgets();
+    if (curMode == MODE_MAIN_MENU) {
+      mainMenuInput(button);
+    } else if (curMode == MODE_DNA_SCAN) {
+      dnaScanInput(button);
     }
   }
+
+  if (curMode == MODE_MAIN_MENU) {
+    mainMenuPoll();
+  } else if (curMode == MODE_DNA_SCAN) {
+    dnaScanPoll();
+  }
+}
+
+void mainMenuInput(int button) {
+  int numButtons = getNumWidgetsOfType(LCARS_WIDGET_BUTTON);
+
+  if (numButtons == 0) {
+    return;
+  }
+
+  int lastButton = curButton;
+
+  if (button == PIN_JOY_UP) {
+    playAudio(tap_wav, TAP_WAV_LEN);
+    curButton -= 1;
+  } else if (button == PIN_JOY_BTN) {
+    void (*callback)() = widgets[getNthWidgetIdxOfType(LCARS_WIDGET_BUTTON, curButton)].callback;
+    if (callback != NULL) {
+      callback();
+    }
+  } else if (button == PIN_JOY_DOWN) {
+    playAudio(tap_wav, TAP_WAV_LEN);
+    curButton += 1;
+  }
+
+  if (curButton < 0) {
+    curButton += numButtons;
+  } else {
+    curButton %= numButtons;
+  }
+
+  if (curButton != lastButton) {
+    size_t lastButtonIdx = getNthWidgetIdxOfType(LCARS_WIDGET_BUTTON, lastButton);
+    size_t curButtonIdx = getNthWidgetIdxOfType(LCARS_WIDGET_BUTTON, curButton);
+    widgets[lastButtonIdx].color = LCARS_BLUE;
+    widgets[lastButtonIdx].dirty = true;
+    widgets[curButtonIdx].color = LCARS_ORANGE;
+    widgets[curButtonIdx].dirty = true;
+  }
+}
+
+void mainMenuPoll() {
+  drawDirtyWidgets();
 }

@@ -50,11 +50,11 @@ Adafruit_ST7789 tft = Adafruit_ST7789(PIN_TFT_CS, PIN_TFT_DC, -1);
 
 WiFiClient client;
 
-
 #include "secrets.h"
 #include "sound.h"
 #include "hass.h"
 #include "menu.h"
+#include "dnascan.h"
 
 void checkSleep() {
   int reedSwitchValue = digitalRead(PIN_MAGNET);
@@ -64,7 +64,7 @@ void checkSleep() {
 
   Serial.println("Sleep");
   analogWrite(PIN_TFT_BL, 0);
-  playAudio16(tng_tricorder_close_wav, TNG_TRICORDER_CLOSE_WAV_LEN);
+  playAudio(tng_tricorder_close_wav, TNG_TRICORDER_CLOSE_WAV_LEN);
   delay(120); // From ST7789 docs, need 120ms between last SLPOUT and SLPIN
   tft.sendCommand(ST7789_SLPIN);
   USBDevice.detach();
@@ -80,7 +80,7 @@ void checkSleep() {
   analogWrite(PIN_TFT_BL, 255);
   delay(5); // From ST7789 docs, need 5ms between last SLPIN and SLPOUT
   tft.sendCommand(ST7789_SLPOUT);
-  playAudio16(tng_tricorder_open_wav, TNG_TRICORDER_OPEN_WAV_LEN);
+  playAudio(tng_tricorder_open_wav, TNG_TRICORDER_OPEN_WAV_LEN);
 }
 
 void wakeupInterruptCallback() {
@@ -112,8 +112,7 @@ void setup() {
   tft.sendCommand(ST7789_PTLON);
   tft.setTextWrap(false);
 
-  tft.fillScreen(ST77XX_BLACK);
-  setupMainMenu();
+  setMode(MODE_MAIN_MENU);
   drawDirtyWidgets();
 
   analogWrite(PIN_TFT_BL, 255);
@@ -156,8 +155,7 @@ void setup() {
 
 
 void loop() {
-  changeRandomColor();
-  checkInput();
+  menuPoll();
   audioPoll();
 
   if (millis() > 3000) {

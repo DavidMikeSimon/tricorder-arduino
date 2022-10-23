@@ -38,7 +38,7 @@ void soundBufferSwapCallback(Adafruit_ZeroDMA *dma) {
   buffersPlayed += 1;
 }
 
-void playAudio16(const uint8_t* buffer, uint32_t length, bool looping = false) {
+void playAudio(const uint8_t* buffer, uint32_t length, bool looping = false) {
   int switchValue = digitalRead(PIN_SWITCH);
   if (!switchValue) {
     return;
@@ -62,9 +62,13 @@ void playAudio16(const uint8_t* buffer, uint32_t length, bool looping = false) {
     writeAudioBuffer(buffer, soundBuf1, EFFECTIVE_AUDIO_BUFSIZE);
     writeAudioBuffer(buffer + EFFECTIVE_AUDIO_BUFSIZE, soundBuf2, EFFECTIVE_AUDIO_BUFSIZE);
   }
-  soundDMA.printStatus(soundDMA.startJob());
+  
+  soundDMA.startJob();
 }
 
+void stopAudio() {
+  soundDMA.abort();
+}
 
 void audioPoll() {
   if (buffersPlayed <= buffersRefilled) {
@@ -80,7 +84,7 @@ void audioPoll() {
       if (audioLooping) {
         buffersPlayed = buffersPlayed % 2;
       } else {
-        soundDMA.abort();
+        stopAudio();
       }
     }
   }
