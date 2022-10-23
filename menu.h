@@ -269,7 +269,7 @@ void tvVolumeDown() {
 
 void scan() {
   Serial.println("SCAN");
-  playAudio16(tng_tricorder_scan_wav, TNG_TRICORDER_SCAN_WAV_LEN);
+  playAudio16(tng_tricorder_scan_wav, TNG_TRICORDER_SCAN_WAV_LEN, true);
 }
 
 void setupMainMenu() {

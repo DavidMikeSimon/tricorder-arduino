@@ -28,35 +28,17 @@ void writeAudioBuffer(const uint8_t* source, uint32_t* dest, uint32_t len) {
   }
 }
 
-uint32_t buffersPlayed = 0;
+const uint8_t* audioSourceBuffer = NULL;
+uint32_t audioSourceLength;
+uint32_t buffersPlayed;
+uint32_t buffersRefilled;
+bool audioLooping;
+
 void soundBufferSwapCallback(Adafruit_ZeroDMA *dma) {
   buffersPlayed += 1;
 }
 
-const uint8_t* audioSourceBuffer = NULL;
-uint32_t audioSourceLength;
-uint32_t buffersRefilled = 0;
-void audioPoll() {
-  if (buffersPlayed <= buffersRefilled) {
-    return;
-  }
-
-  uint32_t* targetBuf = buffersPlayed % 2 == 1 ? soundBuf1 : soundBuf2;
-  const uint8_t* sourcePtr = audioSourceBuffer + EFFECTIVE_AUDIO_BUFSIZE*(buffersPlayed+1);
-  uint32_t writeLength = EFFECTIVE_AUDIO_BUFSIZE;
-  if (sourcePtr + EFFECTIVE_AUDIO_BUFSIZE >= audioSourceBuffer + audioSourceLength) {
-    writeLength = audioSourceLength % EFFECTIVE_AUDIO_BUFSIZE;
-    if (sourcePtr >= audioSourceBuffer + audioSourceLength) {
-      soundDMA.abort();
-    }
-  }
-  writeAudioBuffer(sourcePtr, targetBuf, writeLength);
-  
-  buffersRefilled = buffersPlayed;
-}
-
-
-void playAudio16(const uint8_t* buffer, uint32_t length) {
+void playAudio16(const uint8_t* buffer, uint32_t length, bool looping = false) {
   int switchValue = digitalRead(PIN_SWITCH);
   if (!switchValue) {
     return;
@@ -64,6 +46,7 @@ void playAudio16(const uint8_t* buffer, uint32_t length) {
 
   audioSourceBuffer = buffer;
   audioSourceLength = length;
+  audioLooping = looping;
   buffersPlayed = 0;
   buffersRefilled = 0;
 
@@ -81,6 +64,31 @@ void playAudio16(const uint8_t* buffer, uint32_t length) {
   }
   soundDMA.printStatus(soundDMA.startJob());
 }
+
+
+void audioPoll() {
+  if (buffersPlayed <= buffersRefilled) {
+    return;
+  }
+
+  uint32_t* targetBuf = buffersPlayed % 2 == 1 ? soundBuf1 : soundBuf2;
+  const uint8_t* sourcePtr = audioSourceBuffer + EFFECTIVE_AUDIO_BUFSIZE*(buffersPlayed+1);
+  uint32_t writeLength = EFFECTIVE_AUDIO_BUFSIZE;
+  if (sourcePtr + EFFECTIVE_AUDIO_BUFSIZE >= audioSourceBuffer + audioSourceLength) {
+    writeLength = audioSourceLength % EFFECTIVE_AUDIO_BUFSIZE;
+    if (sourcePtr >= audioSourceBuffer + audioSourceLength) {
+      soundDMA.abort();
+      if (audioLooping) {
+        playAudio16(audioSourceBuffer, audioSourceLength, true);
+      }
+    }
+  }
+  writeAudioBuffer(sourcePtr, targetBuf, writeLength);
+  
+  buffersRefilled = buffersPlayed;
+}
+
+
 
 DmacDescriptor* soundDMADescSetup(uint32_t* buf) {
    DmacDescriptor* desc = soundDMA.addDescriptor(
