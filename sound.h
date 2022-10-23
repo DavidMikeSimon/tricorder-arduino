@@ -1,7 +1,6 @@
-#define AUDIO_BUFSIZE 512
+#define AUDIO_BUFSIZE 1024
 // TODO: Use I2S in mono mode so we don't need to do this
-//#define EFFECTIVE_AUDIO_BUFSIZE AUDIO_BUFSIZE/2
-#define EFFECTIVE_AUDIO_BUFSIZE AUDIO_BUFSIZE
+#define EFFECTIVE_AUDIO_BUFSIZE AUDIO_BUFSIZE/2
 
 uint32_t soundBuf1[AUDIO_BUFSIZE];
 uint32_t soundBuf2[AUDIO_BUFSIZE];
@@ -19,9 +18,12 @@ void writeAudioBuffer(const uint8_t* source, uint32_t* dest, uint32_t len) {
   uint32_t* destPtr = dest;
   const uint8_t* endPtr = source + len;
   for (const uint8_t* sourcePtr = source; sourcePtr < endPtr; sourcePtr += 2) {
-    uint32_t sample = (*(sourcePtr + 1) << 24) | (*sourcePtr << 16);
-    // TODO: Use I2S in mono mode so we don't need to write each sample twice
-    //*destPtr++ = sample;
+    uint32_t sample = ((*(sourcePtr + 1) << 24) | (*sourcePtr << 16))/3;
+    // TODO: Use I2S in mono mode so we don't need to write the sample once for each channel
+    // TODO: Get 22050Hz mode working, so I don't have to double the sample *again*
+    *destPtr++ = sample;
+    *destPtr++ = sample;
+    *destPtr++ = sample;
     *destPtr++ = sample;
   }
 }
@@ -120,7 +122,7 @@ void soundSetup() {
 
   soundDMA.loop(true);
 
-  if (!i2s.begin(I2S_32_BIT, 22050)) {
+  if (!i2s.begin(I2S_32_BIT, 44100)) {
     Serial.println("Unable to initialize I2S");
     return;
   }
